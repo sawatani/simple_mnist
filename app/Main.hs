@@ -1,6 +1,20 @@
 module Main where
 
-import Lib
+import Learn
+import Layers
+import Mnist
 
 main :: IO ()
-main = someFunc
+main = newManager defaultManagerSettings >>= saveMnist "mnist" "http://yann.lecun.com/exdb/mnist/" [
+    "train-images-idx3-ubyte.gz"
+  , "train-labels-idx1-ubyte.gz"
+  , "t10k-images-idx3-ubyte.gz"
+  , "t10k-labels-idx1-ubyte.gz"
+  ] >>= mapM readMnist >>= \ms -> do
+      let [MnistData srcTrains, MnistData srcTests] = map (\[Right a, Left b] -> b `zipMnist` a) $ chunksOf 2 ms
+      trainers <- MnistData <$> shuffleList (take 60000 srcTrains)
+      tests <- MnistData <$> shuffleList (take 10000 srcTests)
+      origin <- initNN SigmoidForward [28*28, 50, 100, 10]
+      let (losses, result) = trainingSimple 0.1 1000 10 origin trainers tests
+      timestamp $ "result=" ++ show (result * 100) ++ "%"
+      -- saveCSV "lean_result.csv" ["index", "loss"] $ map (^..each) $ [0..] `zip` reverse losses

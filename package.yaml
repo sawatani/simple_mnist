@@ -21,15 +21,46 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base >= 4.7 && < 5
+- binary
+- bytestring
+- conduit
+- containers
+- deepseq
+- directory
+- filepath
+- hmatrix
+- http-client
+- http-types
+- lens
+- split
+- time
+- transformers
+- utf8-string
+- mtl
+- mwc-random
+- regex
+- yaml
+- vector
+- zlib
 
 library:
   source-dirs: src
+
+default-extensions:
+- ConstraintKinds         
+- FlexibleContexts       
+- FunctionalDependencies
+- MonomorphismRestriction 
+- OverloadedStrings      
+- ScopedTypeVariables   
+- TemplateHaskell      
 
 executables:
   SimpleMNIST-exe:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
+    - -dynamic
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
@@ -41,6 +72,7 @@ tests:
     main:                Spec.hs
     source-dirs:         test
     ghc-options:
+    - -dynamic
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N

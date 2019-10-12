@@ -1,24 +1,25 @@
-module Synapse
-    (
-      sigmoid
-    , sigmoidm
-    , sigmoidBackward
-    , relu
-    , relum
-    , relumBackward
-    , softmax
-    , softmaxm
-    , softmaxWithCross
-    , softmaxWithCrossBackward
-    , crossEntropy
-    , crossEntropym
-    , affinem
-    , affinemBackward
-    ) where
+{-# LANGUAGE FlexibleContexts #-}
 
-import           Prelude                     hiding ((<>))
+module Synapse (
+  sigmoid
+, sigmoidm
+, sigmoidBackward
+, relu
+, relum
+, relumBackward
+, softmax
+, softmaxm
+, softmaxWithCross
+, softmaxWithCrossBackward
+, crossEntropy
+, crossEntropym
+, affinem
+, affinemBackward
+) where
+
 import           Debug.Trace
 import           Numeric.LinearAlgebra
+import           Prelude               hiding ((<>))
 
 sigmoid :: (Floating a) => a -> a
 sigmoid a = fromIntegral 1 / (fromIntegral 1 + exp (-a))

@@ -1,23 +1,22 @@
-module Mnist
-    (
-      MnistData(..)
-    , MnistLabels(..)
-    , MnistImages(..)
-    , timestamp
-    , saveMnist
-    , readMnist
-    , zipMnist
-    ) where
+module Mnist (
+  MnistData(..)
+, MnistLabels(..)
+, MnistImages(..)
+, timestamp
+, saveMnist
+, readMnist
+, zipMnist
+) where
 
-import qualified Codec.Compression.GZip      as GZip
+import qualified Codec.Compression.GZip     as GZip
 import           Control.Arrow
 import           Control.DeepSeq
 import           Control.Monad.State
-import           Data.Binary                 as B
-import           Data.Binary.Get.Internal    as BGI
-import qualified Data.ByteString             as BSS
-import qualified Data.ByteString.Lazy        as BS
-import qualified Data.ByteString.Lazy.UTF8   as UTF8
+import           Data.Binary                as B
+import           Data.Binary.Get.Internal   as BGI
+import qualified Data.ByteString            as BSS
+import qualified Data.ByteString.Lazy       as BS
+import qualified Data.ByteString.Lazy.UTF8  as UTF8
 import           Data.List.Split
 import           Data.Time.Format
 import           Data.Time.LocalTime

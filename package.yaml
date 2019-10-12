@@ -35,6 +35,7 @@ dependencies:
 - lens
 - split
 - time
+- text
 - transformers
 - utf8-string
 - mtl
@@ -48,13 +49,7 @@ library:
   source-dirs: src
 
 default-extensions:
-- ConstraintKinds         
-- FlexibleContexts       
-- FunctionalDependencies
-- MonomorphismRestriction 
 - OverloadedStrings      
-- ScopedTypeVariables   
-- TemplateHaskell      
 
 executables:
   SimpleMNIST-exe:

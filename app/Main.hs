@@ -1,8 +1,10 @@
 module Main where
 
-import Learn
-import Layers
-import Mnist
+import           Control.Lens
+import           Layers
+import           Learn
+import           Mnist
+import           Util
 
 main :: IO ()
 main = newManager defaultManagerSettings >>= saveMnist "mnist" "http://yann.lecun.com/exdb/mnist/" [
@@ -17,4 +19,4 @@ main = newManager defaultManagerSettings >>= saveMnist "mnist" "http://yann.lecu
       origin <- initNN SigmoidForward [28*28, 50, 100, 10]
       let (losses, result) = trainingSimple 0.1 1000 10 origin trainers tests
       timestamp $ "result=" ++ show (result * 100) ++ "%"
-      -- saveCSV "lean_result.csv" ["index", "loss"] $ map (^..each) $ [0..] `zip` reverse losses
+      saveCSV "lean_result.csv" ["index", "loss"] $ map (^..each) $ [0..] `zip` reverse losses

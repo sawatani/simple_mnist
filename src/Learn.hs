@@ -1,25 +1,21 @@
-module Learn
-    (
-      newManager
-    , defaultManagerSettings
-    , shuffleList
-    , initNN
-    , trainingSimple
-    , chunksOf
-    ) where
+{-# LANGUAGE FlexibleContexts #-}
 
-import Layers
-import Mnist
+module Learn (
+  newManager
+, defaultManagerSettings
+, initNN
+, trainingSimple
+, chunksOf
+) where
+
 import           Control.Arrow
 import           Data.List
 import           Data.List.Split
-import qualified Data.Vector                 as V
-import qualified Data.Vector.Generic         as VG
-import qualified Data.Vector.Generic.Mutable as VM
 import           Debug.Trace
+import           Layers
+import           Mnist
 import           Network.HTTP.Client
 import           Numeric.LinearAlgebra
-import           System.Random.MWC
 
 normalAffine :: Int -> Int -> IO (ForwardLayer R)
 normalAffine nIn nOut = do
@@ -57,25 +53,3 @@ trainingSimple rate batchSize nReplicate nn trainData testData = (losses, evalua
         trainBatches = convertTrains batchSize trainData
         batches = concat $ replicate nReplicate trainBatches
         (ForwardNN layers _, losses) = learnAll rate nn batches
-
-
-shuffleList :: [a] -> IO [a]
-shuffleList [a] = return [a]
-shuffleList xs =  withSystemRandom . asGenST $ \g -> do
-    v <- VG.unsafeThaw $ VG.fromList xs
-    repeatSwap v g n
-    (v' :: V.Vector a) <- VG.unsafeFreeze v
-    return $ VG.toList v'
-    where
-        n = length xs - 1
-        repeatSwap v g i = if (i < 0) then return () else do
-            j <- uniformR (0, n) g
-            VM.swap v j i
-            repeatSwap v g (i - 1)
-
-
-
--- saveCSV :: Show a => FilePath -> [String] -> [[a]] -> IO ()
--- saveCSV filePath header body = do
---     let rows = map (map show) body
---     CSV.writeCSVFile CSV.defCSVSettings filePath WriteMode $ header:rows

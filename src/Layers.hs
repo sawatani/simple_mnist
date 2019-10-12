@@ -1,33 +1,35 @@
-module Layers
-    (
-      ForwardLayer(..)
-    , OutputLayer(..)
-    , ForwardNN(..)
-    , BackwardLayer(..)
-    , BackputLayer(..)
-    , BackwardNN(..)
-    , TrainBatch(..)
-    , NElement(..)
-    , (<~)
-    , (~>)
-    , forward
-    , output
-    , backward
-    , backput
-    , learnForward
-    , learnBackward
-    , learn
-    , learnAll
-    , predict
-    , evaluate
-    ) where
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ConstraintKinds #-}
 
-import Synapse
+module Layers (
+  ForwardLayer(..)
+, OutputLayer(..)
+, ForwardNN(..)
+, BackwardLayer(..)
+, BackputLayer(..)
+, BackwardNN(..)
+, TrainBatch(..)
+, NElement(..)
+, (<~)
+, (~>)
+, forward
+, output
+, backward
+, backput
+, learnForward
+, learnBackward
+, learn
+, learnAll
+, predict
+, evaluate
+) where
+
 import           Control.Arrow
-import           Control.Lens hiding ((<~))
+import           Control.Lens          hiding ((<~))
 import           Debug.Trace
 import           Numeric
 import           Numeric.LinearAlgebra
+import           Synapse
 
 type Weight a = Matrix a
 type Bias a = Vector a

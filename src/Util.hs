@@ -3,10 +3,14 @@
 module Util (
   shuffleList
 , saveCSV
+, timestamp
 ) where
 
-import Data.ByteString.Lazy as BS hiding(map)
+import           Control.DeepSeq
+import           Data.ByteString.Lazy        as BS hiding (map)
 import           Data.Csv
+import           Data.Time.Format
+import           Data.Time.LocalTime
 import qualified Data.Vector                 as V
 import qualified Data.Vector.Generic         as VG
 import qualified Data.Vector.Generic.Mutable as VM
@@ -31,3 +35,9 @@ saveCSV filePath columnNames body = BS.writeFile filePath buf
     where
       buf = encode $ columnNames : rows
       rows = map (map show) body
+
+timestamp :: String -> IO ()
+timestamp msg = msg `deepseq` do
+    t <- getZonedTime
+    let fm = "[%Y/%m/%d %H:%M:%S] " ++ msg
+    print $ formatTime defaultTimeLocale fm t

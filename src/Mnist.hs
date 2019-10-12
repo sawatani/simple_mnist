@@ -2,7 +2,6 @@ module Mnist (
   MnistData(..)
 , MnistLabels(..)
 , MnistImages(..)
-, timestamp
 , saveMnist
 , readMnist
 , zipMnist
@@ -18,13 +17,12 @@ import qualified Data.ByteString            as BSS
 import qualified Data.ByteString.Lazy       as BS
 import qualified Data.ByteString.Lazy.UTF8  as UTF8
 import           Data.List.Split
-import           Data.Time.Format
-import           Data.Time.LocalTime
 import           Debug.Trace
 import           Network.HTTP.Client
 import           Numeric.LinearAlgebra.Data
 import           System.Directory
 import           System.FilePath.Posix
+import           Util
 
 newtype MnistLabels = MnistLabels [Word8] deriving (Show)
 newtype MnistImages = MnistImages [Matrix Z] deriving (Show)
@@ -75,13 +73,6 @@ instance B.Binary MnistImages where
         zs <- map fromIntegral <$> BGI.readN total BSS.unpack
         let images = map (nRows >< nCols) $ chunksOf (nRows * nCols) zs
         return $ MnistImages images
-
-
-timestamp :: String -> IO ()
-timestamp msg = msg `deepseq` do
-    t <- getZonedTime
-    let fm = "[%Y/%m/%d %H:%M:%S] " ++ msg
-    print $ formatTime defaultTimeLocale fm t
 
 download :: Manager -> String -> IO BS.ByteString
 download manager url = do

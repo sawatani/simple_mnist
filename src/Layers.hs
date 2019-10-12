@@ -23,42 +23,11 @@ module Layers
     ) where
 
 import Synapse
-import qualified Codec.Compression.GZip      as GZip
 import           Control.Arrow
-import           Control.DeepSeq
 import           Control.Lens hiding ((<~))
-import           Control.Monad               (join)
-import           Control.Monad.ST
-import           Control.Monad.State
-import           Control.Monad.Trans.Class
-import           Data.Binary                 as B
-import           Data.Binary.Get.Internal    as BGI
-import qualified Data.ByteString             as BSS
-import qualified Data.ByteString.Lazy        as BS
-import qualified Data.ByteString.Lazy.UTF8   as UTF8
-import qualified Data.Conduit                as CD
--- import qualified Data.CSV.Conduit            as CSV
-import           Data.Int
-import           Data.List
-import           Data.List.Split
-import qualified Data.Map                    as Map
-import           Data.Time.Clock
-import           Data.Time.Format
-import           Data.Time.LocalTime
-import qualified Data.Vector                 as V
-import qualified Data.Vector.Generic         as VG
-import qualified Data.Vector.Generic.Mutable as VM
 import           Debug.Trace
-import           Network.HTTP.Client
-import           Network.HTTP.Types.Status   (statusCode)
 import           Numeric
 import           Numeric.LinearAlgebra
-import           Numeric.LinearAlgebra.Data
-import           Prelude                     hiding ((<>))
-import           System.Directory
-import           System.FilePath.Posix
-import           System.IO
-import           System.Random.MWC
 
 type Weight a = Matrix a
 type Bias a = Vector a

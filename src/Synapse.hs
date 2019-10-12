@@ -17,22 +17,8 @@ module Synapse
     ) where
 
 import           Prelude                     hiding ((<>))
-import           Control.Arrow
-import           Control.Monad               (join)
-import           Control.Monad.ST
-import           Control.Monad.State
-import           Control.Monad.Trans.Class
-import           Data.Int
-import           Data.List
-import           Data.List.Split
-import qualified Data.Map                    as Map
-import           Data.Time.Clock
-import           Data.Time.Format
-import           Data.Time.LocalTime
 import           Debug.Trace
-import           Numeric
 import           Numeric.LinearAlgebra
-import           Numeric.LinearAlgebra.Data
 
 sigmoid :: (Floating a) => a -> a
 sigmoid a = fromIntegral 1 / (fromIntegral 1 + exp (-a))

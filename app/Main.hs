@@ -5,9 +5,21 @@ import           Layers
 import           Learn
 import           Mnist
 import           Util
+import System.Environment
+import System.Directory
+import Data.List
 
 main :: IO ()
-main = newManager defaultManagerSettings >>= saveMnist "mnist" "http://yann.lecun.com/exdb/mnist/" [
+main = do
+  args <- getArgs
+  let dirPath = case args of
+        path:_ -> path
+        _ -> "."
+  setCurrentDirectory dirPath
+  doLearn
+
+doLearn :: IO ()
+doLearn = newManager defaultManagerSettings >>= saveMnist "mnist" "http://yann.lecun.com/exdb/mnist/" [
     "train-images-idx3-ubyte.gz"
   , "train-labels-idx1-ubyte.gz"
   , "t10k-images-idx3-ubyte.gz"

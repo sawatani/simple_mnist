@@ -21,6 +21,7 @@ spec = do
   describe "ReLU" propsReLU
   describe "Softmax" propsSoftmax
   describe "CrossEntropy" propsCrossEntropy
+  describe "SoftmaxWithCross" propsSoftmaxWithCross
 
 propsSigmoid = do
   prop "make with exp" $
@@ -104,6 +105,31 @@ propsCrossEntropy = do
               xs = zipWith crossEntropy ts ys
               x = sum xs / fromIntegral m
            in r `shouldBe` x
+
+propsSoftmaxWithCross = do
+  prop "composite" $
+    forAll genMN $ \(m, n) ->
+      forAll (genSignals m n) $ \vss ->
+        forAll (vectorOf m $ genTeacher n) $ \tss ->
+          let tx = A.fromRows $ map A.vector tss
+              vx = A.fromRows $ map A.vector vss
+              r = softmaxWithCross tx vx
+              y = softmaxm vx
+              c = crossEntropym tx y
+           in r `shouldBe` (y, c)
+  prop "calc diff" $
+    forAll genMN $ \(m, n) ->
+      forAll (genSignals m n) $ \vss ->
+        forAll (vectorOf m $ genTeacher n) $ \tss ->
+          let ts = concat tss
+              tx = (m A.>< n) ts
+              y = softmaxm $ A.fromLists vss
+              ys = concat $ A.toLists y
+              r = softmaxWithCrossBackward tx y
+              d = (m A.>< n) $ zipWith (\y t -> (y -t) / fromIntegral m) ys ts
+              roundy n v = fromIntegral (floor $ v * 10^n) / 10.0^^n
+              reduce a = map (roundy 8) $ concat $ A.toLists a
+           in reduce r `shouldBe` reduce d
 
 genSignal :: Gen Double
 genSignal = (arbitrary :: Gen Double) `suchThat` (\a -> -10 <= a && a <= 10)

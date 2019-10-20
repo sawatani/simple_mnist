@@ -22,6 +22,7 @@ spec = do
   describe "Softmax" propsSoftmax
   describe "CrossEntropy" propsCrossEntropy
   describe "SoftmaxWithCross" propsSoftmaxWithCross
+  describe "Affine" propsAffine
 
 propsSigmoid = do
   prop "make with exp" $
@@ -127,9 +128,41 @@ propsSoftmaxWithCross = do
               ys = concat $ A.toLists y
               r = softmaxWithCrossBackward tx y
               d = (m A.>< n) $ zipWith (\y t -> (y -t) / fromIntegral m) ys ts
-              roundy n v = fromIntegral (floor $ v * 10^n) / 10.0^^n
-              reduce a = map (roundy 8) $ concat $ A.toLists a
            in reduce r `shouldBe` reduce d
+
+propsAffine = do
+  prop "forward" $
+    forAll (choose (1, 10)) $ \l ->
+      forAll genMN $ \(m, n) ->
+        forAll (genSignals m n) $ \wss ->
+          forAll (vectorOf n genSignal) $ \bs ->
+            forAll (genSignals l m) $ \xss ->
+              let x = A.fromLists xss
+                  w = A.fromLists wss
+                  b = A.vector bs
+                  y = affinem w b x
+                  rows = zipWith row (A.toRows x) (replicate l $ A.toColumns w)
+                  r = A.fromLists $ map (zipWith (+) bs) rows
+               in reduce y `shouldBe` reduce r
+  prop "backward" $
+    forAll (choose (1, 10)) $ \l ->
+      forAll genMN $ \(m, n) ->
+        forAll (genSignals m n) $ \wss ->
+          forAll (genSignals l m) $ \xss ->
+            forAll (genSignals l n) $ \dss ->
+              let x = A.fromLists xss
+                  w = A.fromLists wss
+                  d = A.fromLists dss
+                  (nx, nw, nb) = affinemBackward w x d
+                  dx =
+                    A.fromLists $
+                    zipWith row (A.toRows d) (replicate l $ A.toRows w)
+                  dw =
+                    A.fromLists $
+                    zipWith row (A.toColumns x) (replicate m $ A.toColumns d)
+                  db = A.vector $ foldr (zipWith (+)) (replicate n 0.0) dss
+               in (reduce nx, reduce nw, reduce $ A.asRow nb) `shouldBe`
+                  (reduce dx, reduce dw, reduce $ A.asRow db)
 
 genSignal :: Gen Double
 genSignal = (arbitrary :: Gen Double) `suchThat` (\a -> -10 <= a && a <= 10)
@@ -147,3 +180,9 @@ genTeacher :: Int -> Gen [Double]
 genTeacher n = do
   i <- choose (0, n - 1)
   return $ replicate i 0.0 ++ 1 : replicate (n - i -1) 0.0
+
+roundy n v = fromIntegral (floor $ v * 10^n) / 10.0^^n
+reduce a = map (roundy 8) $ concat $ A.toLists a
+
+cell arow bcol = sum $ zipWith (*) (A.toList arow) (A.toList bcol)
+row arow = map (cell arow)

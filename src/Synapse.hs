@@ -72,25 +72,13 @@ softmaxWithCrossBackward t y = (y - t) / batchSize
         batchSize = fromIntegral $ rows t
 
 affinem :: (Floating a, Numeric a, Num (Vector a), Show a) => Matrix a -> Vector a -> Matrix a -> Matrix a
-affinem w b x = trace (
-        "-------------"
-        ++ "\nAffine input: " ++ show (sumElements x)
-        ++ "\nAffile weight: " ++ show (sumElements w)
-        ++ "\nAffine bias: " ++ show (sumElements b')
-        ++ "\nAffine result: " ++ show (sumElements r)
-        ) r
-    where
-        r = (x <> w) + b'
-        b' = fromRows $ replicate (rows x) b
+affinem w b x = (x <> w) + b'
+  where
+    b' = fromRows $ replicate (rows x) b
 
 affinemBackward :: (Floating a, Numeric a, Show a) => Matrix a -> Matrix a -> Matrix a -> (Matrix a, Matrix a, Vector a)
-affinemBackward w x d = trace (
-        "______________"
-        ++ "\n AffineBackword weight: " ++ show (sumElements dw)
-        ++ "\n AffineBackword bias: " ++ show (sumElements db)
-        ++ "\n AffineBackword backword: " ++ show (sumElements dx)
-        ) (dx, dw, db)
-    where
-        dx = d <> tr w
-        dw = tr x <> d
-        db = fromList $ sumElements `map` toColumns d
+affinemBackward w x d = (dx, dw, db)
+  where
+    dx = d <> tr w
+    dw = tr x <> d
+    db = fromList $ sumElements `map` toColumns d

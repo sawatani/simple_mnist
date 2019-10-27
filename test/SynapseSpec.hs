@@ -12,17 +12,19 @@ runTest = hspec spec
 
 spec :: Spec
 spec = do
-  describe "Double" $ do
-    prop "multiple" $
-      let small a = a /= 0 && -1 < a && a < 1
-       in forAll (vectorOf 3 (genSignal `suchThat` small)) $ \[a, b, c] ->
-            a * b * c `shouldNotBe` 0
+  describe "Double" propsDouble
   describe "Sigmoid" propsSigmoid
   describe "ReLU" propsReLU
   describe "Softmax" propsSoftmax
   describe "CrossEntropy" propsCrossEntropy
   describe "SoftmaxWithCross" propsSoftmaxWithCross
   describe "Affine" propsAffine
+
+propsDouble = do
+  prop "multiple" $
+    let small a = a /= 0 && -1 < a && a < 1
+     in forAll (vectorOf 3 (genSignal `suchThat` small)) $ \[a, b, c] ->
+          a * b * c `shouldNotBe` 0
 
 propsSigmoid = do
   prop "make with exp" $

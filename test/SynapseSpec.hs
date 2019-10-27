@@ -22,9 +22,18 @@ spec = do
 
 propsDouble = do
   prop "multiple" $
-    let small a = a /= 0 && -1 < a && a < 1
-     in forAll (vectorOf 3 (genSignal `suchThat` small)) $ \[a, b, c] ->
-          a * b * c `shouldNotBe` 0
+    forAll (vectorOf 3 (genSignal `suchThat` small)) $ \[a, b, c] ->
+      let x3 a = a ^ 3
+       in x3 a * x3 b * x3 c `shouldNotBe` 0
+  prop "roundy" $
+    forAll (genSignal `suchThat` small) $ \a ->
+      let b = abs a
+          x = foldr (\i j -> b ^ i + j) 0 [0..6]
+          y = roundy 4 x
+          e = 0.0001
+       in (y < x && (x - e) < y) `shouldBe` True
+  where
+    small a = a /= 0 && -1 < a && a < 1
 
 propsSigmoid = do
   prop "make with exp" $

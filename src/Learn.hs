@@ -4,11 +4,14 @@ module Learn (
   newManager
 , defaultManagerSettings
 , initNN
+, hotone
+, convertTrains
+, convertTests
 , trainingSimple
 , chunksOf
 ) where
 
-import           Control.Arrow
+import           Data.Bifunctor
 import           Data.List
 import           Data.List.Split
 import           Debug.Trace
@@ -29,27 +32,28 @@ initNN eoa ns = do
     let layers = foldl' (\b a -> a ~> eoa ~> b) lastAffine affines
     return $ ForwardNN layers SoftmaxWithCrossForward
         where
-            spans rs (a:b:[]) = (a, b):rs
+            spans rs [a, b]   = (a, b):rs
             spans rs (a:b:xs) = spans ((a, b):rs) (b:xs)
 
 convertTrains :: Int -> MnistData -> [TrainBatch R]
-convertTrains batchSize (MnistData src) = map (mkTrainer . unzip) $ chunksOf batchSize $ vectors
+convertTrains batchSize (MnistData src) = map (mkTrainer . unzip) $ chunksOf batchSize vectors
     where
-        vectors = map (first (hotone 10) . second flatten) src
-        mkTrainer (a, b) = TrainBatch (fromRows a, (fromZ $ fromRows b) / 255)
+        vectors = map (bimap (hotone 10) flatten) src
+        mkTrainer (a, b) = TrainBatch (fromRows a, fromZ (fromRows b) / 255)
 
-hotone :: (Integral v, NElement a) => Int -> v -> (Vector a)
+hotone :: (Integral v, NElement a) => Int -> v -> Vector a
 hotone n v = fromList $ map fromIntegral list
     where
         list = replicate i 0 ++ 1 : replicate (n - i - 1) 0
         i = fromIntegral v
 
 convertTests :: MnistData -> [(Int, Vector R)]
-convertTests (MnistData src) = map (first fromIntegral . second ((/255) . flatten . fromZ)) src
+convertTests (MnistData src) = map (bimap fromIntegral $ (/255) . flatten . fromZ) src
 
 trainingSimple :: Double -> Int -> Int -> ForwardNN R -> MnistData -> MnistData -> ([Double], Double)
-trainingSimple rate batchSize nReplicate nn trainData testData = (losses, evaluate layers $ convertTests testData)
-    where
-        trainBatches = convertTrains batchSize trainData
-        batches = concat $ replicate nReplicate trainBatches
-        (ForwardNN layers _, losses) = learnAll rate nn batches
+trainingSimple rate batchSize nReplicate nn trainData testData =
+  (losses, evaluate layers $ convertTests testData)
+  where
+    trainBatches = convertTrains batchSize trainData
+    batches = concat $ replicate nReplicate trainBatches
+    (ForwardNN layers _, losses) = learnAll rate nn batches

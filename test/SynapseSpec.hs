@@ -5,7 +5,6 @@ import           Synapse
 import           Test.Hspec
 import           Test.Hspec.QuickCheck (prop)
 import           Test.QuickCheck
-import           Text.Printf
 
 runTest :: IO ()
 runTest = hspec spec

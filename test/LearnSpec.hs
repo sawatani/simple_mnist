@@ -1,14 +1,17 @@
-module LearnSpec (spec) where
+module LearnSpec
+  ( spec
+  ) where
 
+import           Control.Monad
+import           Data.Bifunctor
+import           Debug.Trace
+import           Foundation.Monad
+import           Layers
 import           Learn
 import           Mnist
-import Foundation.Monad
-import Control.Monad
-import Debug.Trace
-import           Data.Bifunctor
 import           Numeric.LinearAlgebra
 import           Test.Hspec
-import           Test.Hspec.QuickCheck (prop)
+import           Test.Hspec.QuickCheck   (prop)
 import           Test.QuickCheck
 import           Test.QuickCheck.Gen
 import           Test.QuickCheck.Monadic
@@ -20,23 +23,45 @@ spec :: Spec
 spec = do
   describe "hotone" propsHotone
   describe "convertTests" propsConvertTests
+  describe "convertTrains" propsConvertTrains
 
 propsHotone =
-  prop "length" $ forAll (genNM 100) $ \(n, m) ->
-  let v = toList $ hotone n m :: [R]
-      (a, k:c) = splitAt m v
-      x = sum $ a ++ c
-   in (length v, x, k) `shouldBe` (n, 0, 1)
+  prop "length" $
+  forAll (genNM 100) $ \(n, m) ->
+    let v = toList $ hotone n m :: [R]
+        (a, k:c) = splitAt m v
+        x = sum $ a ++ c
+     in (length v, x, k) `shouldBe` (n, 0, 1)
 
 propsConvertTests =
-  prop "div 255" $ forAll genMnistData $ \d ->
-  let r = convertTests d
-      MnistData ns = d
-      (ts, is) = second concat $ unzip $ map (second $ concat . toLists) ns
-      (ps, vs) = second concat $ unzip $ map (second toList) r
-      x1 = map fromIntegral ts
-      x2 = map (round . (*255)) vs
-  in (x1, is) `shouldBe` (ps, x2)
+  prop "div 255" $
+  forAll genMnistData $ \d ->
+    let r = convertTests d
+        MnistData ns = d
+        (ts, is) = second concat $ unzip $ map (second $ concat . toLists) ns
+        (ps, vs) = second concat $ unzip $ map (second toList) r
+        x1 = map fromIntegral ts
+        x2 = map (round . (* 255)) vs
+     in (x1, is) `shouldBe` (ps, x2)
+
+propsConvertTrains = do
+  prop "length" $
+    forAll genMnistData $ \d ->
+      let r = convertTrains (length ns `div` 10) d
+          MnistData ns = d
+          (xs, ys) = unzip $ map countRows r
+          countRows (TrainBatch a) = bimap rows rows a
+          a = sum xs
+          b = length ns
+       in (xs, a) `shouldBe` (ys, b)
+  prop "div 255" $
+    forAll genMnistData $ \d ->
+      let r = convertTrains (length ns `div` 10) d
+          MnistData ns = d
+          xs = map fromIntegral $ concatMap (concat . toLists . snd) ns
+          ys = map (round . (* 255)) $ concatMap flatMs r
+          flatMs (TrainBatch (_, ms)) = concat $ toLists ms
+       in xs `shouldBe` ys
 
 genNM :: Int -> Gen (Int, Int)
 genNM x = do
@@ -46,11 +71,11 @@ genNM x = do
 
 genMnistData :: Gen MnistData
 genMnistData = do
-  len <- choose (1, 10)
-  nRows <- choose (1, 10)
-  nCols <- choose (1, 10)
+  len <- choose (10, 100)
+  nRows <- choose (10, 20)
+  nCols <- choose (10, 20)
   ms <- vectorOf len $ genMatrixZ 255 nRows nCols
-  vs <- vectorOf len $ choose (0, 10)
+  vs <- vectorOf len $ choose (0, 9)
   return $ MnistData $ zip vs ms
 
 genMatrixZ :: Int -> Int -> Int -> Gen (Matrix Z)

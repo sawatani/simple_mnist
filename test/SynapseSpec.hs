@@ -1,4 +1,6 @@
-module SynapseSpec (spec) where
+module SynapseSpec
+  ( spec
+  ) where
 
 import qualified Numeric.LinearAlgebra as A
 import           Synapse
@@ -27,7 +29,7 @@ propsDouble = do
   prop "roundy" $
     forAll (genSignal `suchThat` small) $ \a ->
       let b = abs a
-          x = foldr (\i j -> b ^ i + j) 0 [0..6]
+          x = foldr (\i j -> b ^ i + j) 0 [0 .. 6]
           y = roundy 4 x
           e = 0.0001
        in (y < x && (x - e) < y) `shouldBe` True
@@ -137,7 +139,7 @@ propsSoftmaxWithCross = do
               y = softmaxm $ A.fromLists vss
               ys = concat $ A.toLists y
               r = softmaxWithCrossBackward tx y
-              d = (m A.>< n) $ zipWith (\y t -> (y -t) / fromIntegral m) ys ts
+              d = (m A.>< n) $ zipWith (\y t -> (y - t) / fromIntegral m) ys ts
            in reduce r `shouldBe` reduce d
 
 propsAffine = do
@@ -189,10 +191,12 @@ genMN = do
 genTeacher :: Int -> Gen [Double]
 genTeacher n = do
   i <- choose (0, n - 1)
-  return $ replicate i 0.0 ++ 1 : replicate (n - i -1) 0.0
+  return $ replicate i 0.0 ++ 1 : replicate (n - i - 1) 0.0
 
-roundy n v = fromIntegral (floor $ v * 10^n) / 10.0^^n
+roundy n v = fromIntegral (floor $ v * 10 ^ n) / 10.0 ^^ n
+
 reduce a = map (roundy 8) $ concat $ A.toLists a
 
 cell arow bcol = sum $ zipWith (*) (A.toList arow) (A.toList bcol)
+
 row arow = map (cell arow)

@@ -1,9 +1,12 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 module LearnSpec
   ( spec
   ) where
 
 import           Control.Monad
 import           Data.Bifunctor
+import qualified Data.Set                as Set
 import           Debug.Trace
 import           Foundation.Monad
 import           Layers
@@ -24,6 +27,7 @@ spec = do
   describe "hotone" propsHotone
   describe "convertTests" propsConvertTests
   describe "convertTrains" propsConvertTrains
+  describe "initNN" propsInitNN
 
 propsHotone =
   prop "length" $
@@ -54,6 +58,19 @@ propsConvertTrains = do
           a = sum xs
           b = length ns
        in (xs, a) `shouldBe` (ys, b)
+  prop "size" $
+    forAll
+      (do d <- genMnistData
+          s <- choose (2, 10)
+          return (s, d)) $ \(s, d) ->
+      let r = convertTrains s d
+          MnistData ns = d
+          (w, c) = size $ snd $ head ns
+          xs = unzip $ map getSize r
+          getSize (TrainBatch a) = bimap size size a
+          uniq = maximum . Set.toList . Set.fromList
+          (a, b) = bimap uniq uniq xs
+       in (a, b) `shouldBe` ((s, 10), (s, w * c))
   prop "div 255" $
     forAll genMnistData $ \d ->
       let r = convertTrains (length ns `div` 10) d
@@ -62,6 +79,18 @@ propsConvertTrains = do
           ys = map (round . (* 255)) $ concatMap flatMs r
           flatMs (TrainBatch (_, ms)) = concat $ toLists ms
        in xs `shouldBe` ys
+
+propsInitNN =
+  it "size of layers" $ do
+    r <- initNN ReLUForward [16, 50, 8, 10]
+    let ForwardNN lA SoftmaxWithCrossForward = r
+    let JoinedForwardLayer lB (AffineForward m3 b3) = lA
+    let JoinedForwardLayer lC ReLUForward = lB
+    let JoinedForwardLayer lD (AffineForward m2 b2) = lC
+    let JoinedForwardLayer (AffineForward m1 b1) ReLUForward = lD
+    let ms = map size [m1, m2, m3]
+    let bs = map size [b1, b2, b3]
+    (ms, bs) `shouldBe` ([(16, 50), (50, 8), (8, 10)], [50, 8, 10])
 
 genNM :: Int -> Gen (Int, Int)
 genNM x = do

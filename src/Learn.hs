@@ -22,8 +22,7 @@ import           Numeric.LinearAlgebra
 
 normalAffine :: Int -> Int -> IO (ForwardLayer R)
 normalAffine nIn nOut = do
-  weights <-
-    trace ("Random Affine: " ++ show nIn ++ "x" ++ show nOut) rand nIn nOut
+  weights <- rand nIn nOut
   bias <- flatten <$> rand nOut 1
   return $ AffineForward weights bias
 

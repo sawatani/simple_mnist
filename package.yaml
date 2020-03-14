@@ -22,12 +22,14 @@ dependencies:
 - containers
 - deepseq
 - directory
+- extra
 - filepath
 - foundation
 - hmatrix
 - http-client
 - http-types
 - lens
+- sort
 - split
 - time
 - text

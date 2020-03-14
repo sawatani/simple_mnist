@@ -5,8 +5,8 @@ module LearnSpec
   ) where
 
 import           Control.Monad
-import           Data.Bifunctor
 import qualified Data.Set                as Set
+import           Data.Tuple.Extra
 import           Debug.Trace
 import           Foundation.Monad
 import           Layers
@@ -54,7 +54,7 @@ propsConvertTrains = do
       let r = convertTrains (length ns `div` 10) d
           MnistData ns = d
           (xs, ys) = unzip $ map countRows r
-          countRows (TrainBatch a) = bimap rows rows a
+          countRows (TrainBatch a) = both rows a
           a = sum xs
           b = length ns
        in (xs, a) `shouldBe` (ys, b)
@@ -67,9 +67,8 @@ propsConvertTrains = do
           MnistData ns = d
           (w, c) = size $ snd $ head ns
           xs = unzip $ map getSize r
-          getSize (TrainBatch a) = bimap size size a
-          uniq = maximum . Set.toList . Set.fromList
-          (a, b) = bimap uniq uniq xs
+          getSize (TrainBatch a) = both size a
+          (a, b) = both (maximum . Set.toList . Set.fromList) xs
        in (a, b) `shouldBe` ((s, 10), (s, w * c))
   prop "div 255" $
     forAll genMnistData $ \d ->

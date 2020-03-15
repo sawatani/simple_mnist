@@ -130,12 +130,7 @@ learnAll rate origin = foldr f (origin, [])
     where f batch (a, results) = a `seq` second (:results) $ learn rate a batch
 
 predict :: NElement a => ForwardLayer a -> Vector a -> Int
-predict layers = maxIndex . flatten . snd . (forward layers) . asRow
--- predict layers sample = maxIndex $ trace ("Evaluated result: " ++ show result) result
---     where
---         m1 = asRow sample
---         (_, m2) = forward layers m1
---         result = flatten m2
+predict layers = maxIndex . flatten . snd . forward layers . asRow
 
 evaluate :: NElement a => ForwardLayer a -> [(Int, Vector a)] -> Double
 evaluate layers samples = fromIntegral nOk / fromIntegral (length samples)

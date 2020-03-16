@@ -10,7 +10,7 @@ import           Foundation.Monad
 import           Layers
 import           Learn
 import           Mnist
-import           Numeric.LinearAlgebra as A
+import           Numeric.LinearAlgebra   as A
 import           Synapse
 import           Test.Hspec
 import           Test.Hspec.QuickCheck   (prop)
@@ -28,6 +28,7 @@ spec = do
   describe "Affine" propsAffine
   describe "Sigmoid" propsSigmoid
   describe "ReLU" propsReLU
+  describe "Joined" propsJoined
 
 propsPredict =
   prop "index" $
@@ -44,14 +45,14 @@ propsEvaluate = do
        in r `shouldBe` 1
   prop "0%" $
     forAll (vectorOf 100 $ genVectorN 100) $ \vs ->
-      let ns = map ((+1) . maxIndex) vs
+      let ns = map ((+ 1) . maxIndex) vs
           r = evaluate ReLUForward $ zip ns vs
        in r `shouldBe` 0
   prop "50%" $
     forAll (vectorOf 100 $ genVectorN 100) $ \vs ->
       let (vA, vB) = splitAt 50 vs
           nA = map maxIndex vA
-          nB = map ((+1) . maxIndex) vB
+          nB = map ((+ 1) . maxIndex) vB
           ns = nA ++ nB
           r = evaluate ReLUForward $ zip ns vs
        in r `shouldBe` 0.5
@@ -142,6 +143,44 @@ propsReLU = do
           e = relumBackward x d
        in d' `shouldBe` e
 
+propsJoined = do
+  prop "forward" $
+    forAll
+      (do a <- choose (10, 100)
+          b <- choose (10, 100)
+          c <- choose (10, 100)
+          f <- genAffine a b
+          x <- genMatrix c a
+          return (f, x)) $ \(fL1, x) ->
+      let fL2 = SigmoidForward
+          fJ = fL1 ~> fL2
+          (bJ, y) = forward fJ x
+          JoinedBackwardLayer bL1 bL2 = bJ
+          AffineBackward bW bB bX = bL1
+          SigmoidBackward bY = bL2
+          ((AffineBackward bW' bB' bX'), yL1) = forward fL1 x
+          ((SigmoidBackward bY'), yL2) = forward fL2 yL1
+       in (bW, bB, bX, bY, y) `shouldBe` (bW', bB', bX', bY', yL2)
+  prop "backward" $
+    forAll
+      (do a <- choose (10, 100)
+          b <- choose (10, 100)
+          c <- choose (10, 100)
+          d <- genMatrix c b
+          y <- genMatrix c b
+          x <- genMatrix c a
+          fL1 <- genAffine a b
+          let AffineForward weights bias = fL1
+          let bL1 = AffineBackward weights bias x
+          return (bL1, SigmoidBackward y, d)) $ \(bL1, bL2, d) ->
+      let bJ = bL1 <~ bL2
+          (fJ, bD) = backward 1.0 bJ d
+          JoinedForwardLayer fL1 fL2 = fJ
+          AffineForward fW fB = fL1
+          (SigmoidForward, dL2) = backward 1.0 bL2 d
+          ((AffineForward fW' fB'), dL1) = backward 1.0 bL1 dL2
+       in (fW, fB, bD) `shouldBe` (fW', fB', dL1)
+
 genVectorN :: Int -> Gen (Vector R)
 genVectorN n = fmap fromList $ vectorOf n $ choose (1, 100)
 
@@ -152,4 +191,5 @@ genAffine nIn nOut = do
   return $ AffineForward weights bias
 
 genMatrix :: Int -> Int -> Gen (Matrix R)
-genMatrix nRows nCols = fmap fromLists $ vectorOf nRows $ vectorOf nCols arbitrary
+genMatrix nRows nCols =
+  fmap fromLists $ vectorOf nRows $ vectorOf nCols arbitrary

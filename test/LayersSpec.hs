@@ -29,6 +29,7 @@ spec = do
   describe "Sigmoid" propsSigmoid
   describe "ReLU" propsReLU
   describe "Joined" propsJoined
+  describe "Matrix" propsMatrix
 
 propsPredict =
   prop "index" $
@@ -175,6 +176,36 @@ propsJoined = do
           (SigmoidForward, dL2) = backward 1.0 bL2 d
           (fL1', dL1) = backward 1.0 bL1 dL2
        in (fL1, bD) `shouldBe` (fL1', dL1)
+
+propsMatrix = do
+  prop "scale" $
+    forAll genElements $ \(a, b, x, y) ->
+      let m = b `A.scale` toMatrix x y a
+          m' = toMatrix x y (a * b)
+       in m `shouldBe` m'
+  prop "multiply" $
+    forAll genElements $ \(a, b, x, y) ->
+      let m = toMatrix x y b * toMatrix x y a
+          m' = toMatrix x y (a * b)
+       in m `shouldBe` m'
+  prop "subtract" $
+    forAll genElements $ \(a, b, x, y) ->
+      let m = toMatrix x y a - toMatrix x y b
+          m' = toMatrix x y (a - b)
+       in m `shouldBe` m'
+  prop "add" $
+    forAll genElements $ \(a, b, x, y) ->
+      let m = toMatrix x y a + toMatrix x y b
+          m' = toMatrix x y (a + b)
+       in m `shouldBe` m'
+  where
+    toMatrix x y a = fromLists $ replicate x $ replicate y a
+    genElements = do
+      a <- arbitrary
+      b <- arbitrary
+      x <- choose (10, 100)
+      y <- choose (10, 100)
+      return (a :: R, b, x, y)
 
 genVectorN :: Int -> Gen (Vector R)
 genVectorN n = fmap fromList $ vectorOf n $ choose (1, 100)

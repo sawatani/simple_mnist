@@ -90,13 +90,13 @@ propsSoftmax = do
           ds = map (\v -> exp $ v - c) vs
           s = sum ds
           xs = map (/ s) ds
-       in (A.toList r) `shouldBe` xs
+       in A.toList r `shouldBe` xs
   prop "apply all rows" $
     forAll genMN $ \(m, n) ->
       forAll (genSignals m n) $ \vss ->
         let r = softmaxm $ (m A.>< n) $ concat vss
             xs = map (softmax . A.vector) vss
-         in (A.toRows r) `shouldBe` xs
+         in A.toRows r `shouldBe` xs
 
 propsCrossEntropy = do
   prop "take sum" $

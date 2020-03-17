@@ -56,6 +56,13 @@ data ForwardLayer a
   | JoinedForwardLayer (ForwardLayer a) (ForwardLayer a)
   deriving (Show)
 
+instance (Numeric a, Eq a) => Eq (ForwardLayer a) where
+  AffineForward w b == AffineForward w' b' = w == w' && b == b'
+  SigmoidForward == SigmoidForward = True
+  ReLUForward == ReLUForward = True
+  JoinedForwardLayer a b == JoinedForwardLayer a' b' = a == a' && b == b'
+  _ == _ = False
+
 infixl 4 ~>
 
 (~>) :: ForwardLayer a -> ForwardLayer a -> ForwardLayer a
@@ -76,6 +83,14 @@ data BackwardLayer a
   | ReLUBackward (SignalX a)
   | JoinedBackwardLayer (BackwardLayer a) (BackwardLayer a)
   deriving (Show)
+
+instance (Numeric a, Eq a) => Eq (BackwardLayer a) where
+  AffineBackward w b d == AffineBackward w' b' d' =
+    w == w' && b == b' && d == d'
+  SigmoidBackward y == SigmoidBackward y' = y == y'
+  ReLUBackward x == ReLUBackward x' = x == x'
+  JoinedBackwardLayer a b == JoinedBackwardLayer a' b' = a == a' && b == b'
+  _ == _ = False
 
 infixr 4 <~
 

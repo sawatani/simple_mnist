@@ -154,13 +154,10 @@ propsJoined = do
           return (f, x)) $ \(fL1, x) ->
       let fL2 = SigmoidForward
           fJ = fL1 ~> fL2
-          (bJ, y) = forward fJ x
-          JoinedBackwardLayer bL1 bL2 = bJ
-          AffineBackward bW bB bX = bL1
-          SigmoidBackward bY = bL2
-          ((AffineBackward bW' bB' bX'), yL1) = forward fL1 x
-          ((SigmoidBackward bY'), yL2) = forward fL2 yL1
-       in (bW, bB, bX, bY, y) `shouldBe` (bW', bB', bX', bY', yL2)
+          (JoinedBackwardLayer bL1 bL2, y) = forward fJ x
+          (bL1', yL1) = forward fL1 x
+          (bL2', yL2) = forward fL2 yL1
+       in (bL1, bL2, y) `shouldBe` (bL1', bL2', yL2)
   prop "backward" $
     forAll
       (do a <- choose (10, 100)
@@ -174,12 +171,10 @@ propsJoined = do
           let bL1 = AffineBackward weights bias x
           return (bL1, SigmoidBackward y, d)) $ \(bL1, bL2, d) ->
       let bJ = bL1 <~ bL2
-          (fJ, bD) = backward 1.0 bJ d
-          JoinedForwardLayer fL1 fL2 = fJ
-          AffineForward fW fB = fL1
+          (JoinedForwardLayer fL1 SigmoidForward, bD) = backward 1.0 bJ d
           (SigmoidForward, dL2) = backward 1.0 bL2 d
-          ((AffineForward fW' fB'), dL1) = backward 1.0 bL1 dL2
-       in (fW, fB, bD) `shouldBe` (fW', fB', dL1)
+          (fL1', dL1) = backward 1.0 bL1 dL2
+       in (fL1, bD) `shouldBe` (fL1', dL1)
 
 genVectorN :: Int -> Gen (Vector R)
 genVectorN n = fmap fromList $ vectorOf n $ choose (1, 100)

@@ -1,5 +1,6 @@
 {-# LANGUAGE ConstraintKinds  #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE QuasiQuotes      #-}
 
 module Layers
   ( ForwardLayer(..)
@@ -25,7 +26,8 @@ module Layers
   ) where
 
 import           Control.Arrow
-import           Control.Lens          hiding ((<~))
+import           Control.Lens            hiding ((<~))
+import           Data.String.Interpolate as S (i)
 import           Debug.Trace
 import           Numeric
 import           Numeric.LinearAlgebra
@@ -163,9 +165,12 @@ learn rate a = first (learnBackward rate) . learnForward a
 
 learnAll ::
      NElement a => a -> ForwardNN a -> [TrainBatch a] -> (ForwardNN a, [a])
-learnAll rate origin = foldr f (origin, [])
+learnAll rate origin batches = ls `seq` (nn, ls)
   where
-    f batch (a, results) = a `seq` second (: results) $ learn rate a batch
+    (nn, ls) = foldr f (origin, []) batches
+    f batch (a, ls) = ls `seq` second (~: ls) $ learn rate a batch
+    x ~: xs = trace [i|[#{length xs + 1}/#{n}] #{show x}|] (x : xs)
+    n = length batches
 
 predict :: NElement a => ForwardLayer a -> Vector a -> Int
 predict layers = maxIndex . flatten . snd . forward layers . asRow

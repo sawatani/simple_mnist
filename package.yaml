@@ -1,5 +1,5 @@
 name:                SimpleMNIST
-version:             0.1.0
+version:             0.2.0.0
 github:              "sawatani/simple_mnist"
 license:             BSD3
 author:              沢谷 邦夫

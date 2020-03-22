@@ -43,10 +43,10 @@ convertTrains batchSize (MnistData src) =
     mkTrainer (a, b) = TrainBatch (fromRows a, fromZ (fromRows b) / 255)
 
 hotone :: (Integral v, NElement a) => Int -> v -> Vector a
-hotone n v = fromList $ map fromIntegral list
+hotone n' v = fromList $ map fromIntegral list
   where
-    zero = if i < n then 0 else error ("Too large value: " ++ show i)
-    list = replicate i zero ++ 1 : replicate (n - i - 1) zero
+    n = if i < n' then n' else error ("Too large value: " ++ show i)
+    list = replicate i 0 ++ 1 : replicate (n - i - 1) 0
     i = fromIntegral v
 
 convertTests :: MnistData -> [(Int, Vector R)]

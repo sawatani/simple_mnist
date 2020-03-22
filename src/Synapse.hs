@@ -92,16 +92,16 @@ softmaxWithCross t x = (y, crossEntropym t y)
     y = softmaxm x
 
 softmaxWithCrossBackward ::
-     (Floating a, Num (Vector a), Container Vector a, Show a)
+     (Floating a, Num (Vector a), Container Vector a)
   => Matrix a
   -> Matrix a
   -> Matrix a
-softmaxWithCrossBackward t y = (y - t) / batchSize
+softmaxWithCrossBackward t y = cmap (/ batchSize) $ y - t
   where
     batchSize = fromIntegral $ rows t
 
 affinem ::
-     (Floating a, Numeric a, Num (Vector a), Show a)
+     (Floating a, Numeric a, Num (Vector a))
   => Matrix a
   -> Vector a
   -> Matrix a
@@ -111,7 +111,7 @@ affinem w b x = (x <> w) + b'
     b' = fromRows $ replicate (rows x) b
 
 affinemBackward ::
-     (Floating a, Numeric a, Show a)
+     (Floating a, Numeric a)
   => Matrix a
   -> Matrix a
   -> Matrix a

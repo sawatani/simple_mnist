@@ -37,6 +37,7 @@ doLearn =
     tests <- MnistData <$> shuffleList (take 10000 srcTests)
     origin <- initNN ReLUForward [28 * 28, 50, 10]
     let (losses, result) = trainingSimple 0.1 1000 1000 origin trainers tests
+    timestamp "Start training"
     timestamp $ "result=" ++ show (result * 100) ++ "%"
     saveCSV ".lean_result.csv" ["index", "loss"] $
       map (^.. each) $ [0 ..] `zip` reverse losses

@@ -20,13 +20,17 @@ import           Mnist
 import           Network.HTTP.Client
 import           Numeric.LinearAlgebra
 
-normalAffine :: Int -> Int -> IO (ForwardLayer R)
+normalAffine :: Int -> Int -> IO (AffineForward R)
 normalAffine nIn nOut = do
   weights <- rand nIn nOut
   bias <- flatten <$> rand nOut 1
   return $ AffineForward weights bias
 
-initNN :: ForwardLayer R -> [Int] -> IO (ForwardNN R)
+initNN ::
+     (NElement e, ForwardLayer x e, ForwardLayer a e, OutputLayer b e)
+  => x
+  -> [Int]
+  -> IO (ForwardNN a b e)
 initNN eoa ns = do
   (lastAffine:affines) <- mapM (uncurry normalAffine) $ spans [] ns
   let layers = foldl' (\b a -> a ~> eoa ~> b) lastAffine affines
@@ -53,11 +57,11 @@ convertTests :: MnistData -> [(Int, Vector R)]
 convertTests (MnistData src) =
   map (bimap fromIntegral $ (/ 255) . flatten . fromZ) src
 
-trainingSimple ::
+trainingSimple :: (ForwardLayer a R, OutputLayer b R)
      Double
   -> Int
   -> Int
-  -> ForwardNN R
+  -> ForwardNN a b
   -> MnistData
   -> MnistData
   -> ([Double], Double)

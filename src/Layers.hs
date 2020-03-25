@@ -67,11 +67,7 @@ Forward Layers
 -}
 class ForwardLayer (a :: * -> *) e where
   type Backward a :: * -> *
-  forward ::
-       (NElement e, BackwardLayer (Backward a) e)
-    => a e
-    -> SignalX e
-    -> (Backward a e, SignalY e)
+  forward :: NElement e => a e -> SignalX e -> (Backward a e, SignalY e)
 
 class OutputLayer (o :: * -> *) e where
   type Backput o :: * -> *
@@ -146,12 +142,7 @@ Backward Layers
 -}
 class BackwardLayer (b :: * -> *) e where
   type Forward b :: * -> *
-  backward ::
-       (NElement e, ForwardLayer (Forward b) e)
-    => e
-    -> b e
-    -> Diff e
-    -> (Forward b e, Diff e)
+  backward :: NElement e => e -> b e -> Diff e -> (Forward b e, Diff e)
 
 class BackputLayer (b :: * -> *) e where
   type Output b e :: *
@@ -205,7 +196,7 @@ instance BackwardLayer ReLUBackward e where
 
 instance (BackwardLayer a e, BackwardLayer b e) =>
          BackwardLayer (JoinedBackwardLayer a b) e where
-  type Forward (JoinedBackwardLayer a b) = JoinedForwardLayer a b
+  type Forward (JoinedBackwardLayer a b) = JoinedForwardLayer (Forward a) (Forward b)
   backward r (JoinedBackwardLayer a b) d0 = (a' ~> b', d2)
     where
       (b', d1) = backward r b d0

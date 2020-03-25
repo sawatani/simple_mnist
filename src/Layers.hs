@@ -6,7 +6,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE QuasiQuotes           #-}
 {-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE UndecidableInstances  #-}
 
 module Layers
   ( ForwardLayer(..)
@@ -66,6 +65,25 @@ newtype TrainBatch a =
 {-
 Forward Layers
 -}
+class ForwardLayer (a :: * -> *) e where
+  type Backward a :: * -> *
+  forward ::
+       (NElement e, BackwardLayer (Backward a) e)
+    => a e
+    -> SignalX e
+    -> (Backward a e, SignalY e)
+
+class OutputLayer (o :: * -> *) e where
+  type Backput o :: * -> *
+  output :: NElement e => o e -> TeacherBatch e -> SignalY e -> (Backput o e, e)
+
+infixl 4 ~>
+
+(~>) ::
+     (ForwardLayer a e, ForwardLayer b e, ForwardLayer c e) => a e -> b e -> c e
+a ~> (JoinedForwardLayer x y) = (a ~> x) ~> y
+a ~> b = JoinedForwardLayer a b
+
 data AffineForward e =
   AffineForward (Weight e) (Bias e)
   deriving (Show)
@@ -89,33 +107,23 @@ data ForwardNN a b e =
   ForwardNN (a e) (b e)
   deriving (Show)
 
-class NElement e =>
-      ForwardLayer (a :: * -> *) e
-  where
-  type Backward a :: * -> *
-  forward ::
-       BackwardLayer (Backward a) e
-    => a e
-    -> SignalX e
-    -> (Backward a e, SignalY e)
-
-instance NElement e => ForwardLayer AffineForward e where
+instance ForwardLayer AffineForward e where
   type Backward AffineForward = AffineBackward
   forward (AffineForward w b) x = (AffineBackward w b x, affinem w b x)
 
-instance NElement e => ForwardLayer SigmoidForward e where
+instance ForwardLayer SigmoidForward e where
   type Backward SigmoidForward = SigmoidBackward
   forward SigmoidForward x = (SigmoidBackward y, y)
     where
       y = sigmoidm x
 
-instance NElement e => ForwardLayer ReLUForward e where
+instance ForwardLayer ReLUForward e where
   type Backward ReLUForward = ReLUBackward
   forward ReLUForward x = (ReLUBackward x, relum x)
 
-instance (NElement e, ForwardLayer a e, ForwardLayer b e) =>
+instance (ForwardLayer a e, ForwardLayer b e) =>
          ForwardLayer (JoinedForwardLayer a b) e where
-  type Backward (JoinedForwardLayer a b) = JoinedBackwardLayer a b
+  type Backward (JoinedForwardLayer a b) = JoinedBackwardLayer (Backward a) (Backward b)
   forward (JoinedForwardLayer a b) x0 = (a' <~ b', x2)
     where
       (a', x1) = forward a x0
@@ -127,19 +135,8 @@ instance (Numeric e, Eq e) => Eq (AffineForward e) where
 instance (Eq (a e), Eq (b e)) => Eq (JoinedForwardLayer a b e) where
   JoinedForwardLayer a b == JoinedForwardLayer a' b' = a == a' && b == b'
 
-infixl 4 ~>
-
-(~>) ::
-     (ForwardLayer a e, ForwardLayer b e, ForwardLayer c e) => a e -> b e -> c e
-a ~> (JoinedForwardLayer x y) = (a ~> x) ~> y
-a ~> b = JoinedForwardLayer a b
-
-class NElement e => OutputLayer (o :: * -> *) e where
-  type Backput o e :: *
-  output :: o e -> TeacherBatch e -> SignalY e -> (Backput o e, e)
-
-instance NElement e => OutputLayer SoftmaxWithCrossForward e where
-  type Backput SoftmaxWithCrossForward e = SoftmaxWithCrossBackward e
+instance OutputLayer SoftmaxWithCrossForward e where
+  type Backput SoftmaxWithCrossForward = SoftmaxWithCrossBackward
   output SoftmaxWithCrossForward t y = (SoftmaxWithCrossBackward t y', loss)
     where
       (y', loss) = softmaxWithCross t y
@@ -147,6 +144,29 @@ instance NElement e => OutputLayer SoftmaxWithCrossForward e where
 {-
 Backward Layers
 -}
+class BackwardLayer (b :: * -> *) e where
+  type Forward b :: * -> *
+  backward ::
+       (NElement e, ForwardLayer (Forward b) e)
+    => e
+    -> b e
+    -> Diff e
+    -> (Forward b e, Diff e)
+
+class BackputLayer (b :: * -> *) e where
+  type Output b e :: *
+  backput :: NElement e => b e -> (Output b e, Diff e)
+
+infixr 4 <~
+
+(<~) ::
+     (BackwardLayer a e, BackwardLayer b e, BackwardLayer c e)
+  => a e
+  -> b e
+  -> c e
+(JoinedBackwardLayer x y) <~ b = x <~ (y <~ b)
+a <~ b = JoinedBackwardLayer a b
+
 data AffineBackward e =
   AffineBackward (Weight e) (Bias e) (SignalX e)
   deriving (Show)
@@ -168,29 +188,22 @@ data SoftmaxWithCrossBackward e =
 data BackwardNN a b e =
   BackwardNN (a e) (b e)
 
-class NElement e =>
-      BackwardLayer (b :: * -> *) e
-  where
-  type Forward b :: * -> *
-  backward ::
-       ForwardLayer (Forward b) e => e -> b e -> Diff e -> (Forward b e, Diff e)
-
-instance NElement e => BackwardLayer AffineBackward e where
+instance BackwardLayer AffineBackward e where
   type Forward AffineBackward = AffineForward
   backward rate (AffineBackward w b x) d =
     (AffineForward (w - scale rate w') (b - scale rate b'), x')
     where
       (x', w', b') = affinemBackward w x d
 
-instance NElement e => BackwardLayer SigmoidBackward e where
+instance BackwardLayer SigmoidBackward e where
   type Forward SigmoidBackward = SigmoidForward
   backward _ (SigmoidBackward y) d = (SigmoidForward, sigmoidBackward y d)
 
-instance NElement e => BackwardLayer ReLUBackward e where
+instance BackwardLayer ReLUBackward e where
   type Forward ReLUBackward = ReLUForward
   backward _ (ReLUBackward x) d = (ReLUForward, relumBackward x d)
 
-instance (NElement e, BackwardLayer a e, BackwardLayer b e) =>
+instance (BackwardLayer a e, BackwardLayer b e) =>
          BackwardLayer (JoinedBackwardLayer a b) e where
   type Forward (JoinedBackwardLayer a b) = JoinedForwardLayer a b
   backward r (JoinedBackwardLayer a b) d0 = (a' ~> b', d2)
@@ -211,21 +224,7 @@ instance (Numeric e, Eq e) => Eq (ReLUBackward e) where
 instance (Eq (a e), Eq (b e)) => Eq (JoinedBackwardLayer a b e) where
   JoinedBackwardLayer a b == JoinedBackwardLayer a' b' = a == a' && b == b'
 
-infixr 4 <~
-
-(<~) ::
-     (BackwardLayer a e, BackwardLayer b e, BackwardLayer c e)
-  => a e
-  -> b e
-  -> c e
-(JoinedBackwardLayer x y) <~ b = x <~ (y <~ b)
-a <~ b = JoinedBackwardLayer a b
-
-class BackputLayer (b :: * -> *) e where
-  type Output b e :: *
-  backput :: NElement e => b e -> (Output b e, Diff e)
-
-instance NElement e => BackputLayer SoftmaxWithCrossBackward e where
+instance BackputLayer SoftmaxWithCrossBackward e where
   type Output SoftmaxWithCrossBackward e = SoftmaxWithCrossForward e
   backput (SoftmaxWithCrossBackward t y) =
     (SoftmaxWithCrossForward, softmaxWithCrossBackward t y)

@@ -62,21 +62,6 @@ newtype TrainBatch a =
   TrainBatch (TeacherBatch a, InputBatch a)
   deriving (Show)
 
-{-
-Forward Layers
--}
-class ForwardLayer a e where
-  type Backward a e :: *
-  forward :: NElement e => a -> SignalX e -> (Backward a e, SignalY e)
-  (~>) :: x -> a -> y
-  x ~> a = JoinedForwardLayer x a
-
-infixl 4 ~>
-
-class OutputLayer o e where
-  type Backput o e :: *
-  output :: NElement e => o -> TeacherBatch e -> SignalY e -> (Backput o e, e)
-
 data AffineForward e =
   AffineForward (Weight e) (Bias e)
   deriving (Show)
@@ -101,6 +86,20 @@ data ForwardNN a b =
   ForwardNN a b
   deriving (Show, Eq)
 
+{-
+Forward Layers
+-}
+class ForwardLayer a e where
+  type Backward a e :: *
+  forward :: NElement e => a -> SignalX e -> (Backward a e, SignalY e)
+
+infixr 4 ~>
+a ~> b = JoinedForwardLayer a b
+
+class OutputLayer o e where
+  type Backput o e :: *
+  output :: NElement e => o -> TeacherBatch e -> SignalY e -> (Backput o e, e)
+
 instance ForwardLayer (AffineForward e) e where
   type Backward (AffineForward e) e = AffineBackward e
   forward (AffineForward w b) x = (AffineBackward w b x, affinem w b x)
@@ -120,9 +119,8 @@ instance (ForwardLayer a e, ForwardLayer b e) =>
   type Backward (JoinedForwardLayer a b) e = JoinedBackwardLayer (Backward a e) (Backward b e)
   forward (JoinedForwardLayer a b) x0 = (a' <~ b', x2)
     where
-      (a', x1) = forward a x0
-      (b', x2) = forward b x1
-  o ~> (JoinedForwardLayer x y) = (o ~> x) ~> y
+      (a', x1) = x0 `seq` forward a x0
+      (b', x2) = x1 `seq` forward b x1
 
 instance (Numeric e, Eq e) => Eq (AffineForward e) where
   AffineForward w b == AffineForward w' b' = w == w' && b == b'
@@ -142,15 +140,13 @@ Backward Layers
 class BackwardLayer b e where
   type Forward b :: *
   backward :: NElement e => e -> b -> Diff e -> (Forward b, Diff e)
-  (<~) :: a -> x -> y
-  a <~ x = JoinedBackwardLayer a x
 
 class BackputLayer b e where
   type Output b :: *
   backput :: NElement e => b -> (Output b, Diff e)
 
-infixr 4 <~
-
+infixl 4 <~
+a <~ b = JoinedBackwardLayer a b
 
 data AffineBackward e =
   AffineBackward (Weight e) (Bias e) (SignalX e)
@@ -198,7 +194,6 @@ instance (BackwardLayer a e, BackwardLayer b e) =>
     where
       (b', d1) = backward r b d0
       (a', d2) = backward r a d1
-  (JoinedBackwardLayer x y) <~ b = x <~ (y <~ b)
 
 instance (Numeric e, Eq e) => Eq (AffineBackward e) where
   AffineBackward w b d == AffineBackward w' b' d' =
@@ -225,12 +220,10 @@ learnForward ::
      ( NElement e
      , ForwardLayer a e
      , OutputLayer b e
-     , BackwardLayer a' e
-     , BackputLayer b' e
      )
   => ForwardNN a b
   -> TrainBatch e
-  -> (BackwardNN a' b', e)
+  -> (BackwardNN (Backward a e) (Backput b e), e)
 learnForward (ForwardNN layers loss) (TrainBatch (t, x)) =
   result `seq` (BackwardNN layers' loss', result)
   where
@@ -239,25 +232,28 @@ learnForward (ForwardNN layers loss) (TrainBatch (t, x)) =
 
 learnBackward ::
      ( NElement e
-     , ForwardLayer a e
-     , OutputLayer b e
      , BackwardLayer a' e
      , BackputLayer b' e
      )
   => e
   -> BackwardNN a' b'
-  -> ForwardNN a b
+  -> ForwardNN (Forward a') (Output b')
 learnBackward rate (BackwardNN layers loss) = ForwardNN layers' loss'
   where
     (loss', d) = backput loss
     (layers', _) = backward rate layers d
 
 learn ::
-     (NElement e, ForwardLayer a e, OutputLayer b e)
+     ( NElement e
+     , ForwardLayer a e
+     , OutputLayer b e
+     , BackwardLayer (Backward a e) e
+     , BackputLayer (Backput b e) e
+     )
   => e
   -> ForwardNN a b
   -> TrainBatch e
-  -> (ForwardNN a b, e)
+  -> (ForwardNN (Forward (Backward a e)) (Output (Backput b e)), e)
 learn rate a = first (learnBackward rate) . learnForward a
 
 learnAll ::

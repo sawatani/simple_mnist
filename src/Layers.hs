@@ -18,6 +18,7 @@ module Layers
   , SigmoidForward(..)
   , ReLUForward(..)
   , JoinedForwardLayer(..)
+  , SoftmaxWithCrossForward(..)
   , AffineBackward(..)
   , SigmoidBackward(..)
   , ReLUBackward(..)
@@ -152,11 +153,11 @@ data AffineBackward e =
   AffineBackward (Weight e) (Bias e) (SignalX e)
   deriving (Show)
 
-data SigmoidBackward e =
+newtype SigmoidBackward e =
   SigmoidBackward (SignalY e)
   deriving (Show)
 
-data ReLUBackward e =
+newtype ReLUBackward e =
   ReLUBackward (SignalX e)
   deriving (Show)
 
@@ -256,12 +257,6 @@ learn ::
   -> (ForwardNN (Forward (Backward a e)) (Output (Backput b e)), e)
 learn rate a = first (learnBackward rate) . learnForward a
 
-learnAll ::
-     (NElement e, ForwardLayer a e, OutputLayer b e)
-  => e
-  -> ForwardNN a b
-  -> [TrainBatch e]
-  -> (ForwardNN a b, [e])
 learnAll rate origin batches = ls `seq` (nn, ls)
   where
     (nn, ls) = foldr f (origin, []) batches

@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies     #-}
 
 module Learn
   ( newManager
@@ -57,14 +58,22 @@ convertTests :: MnistData -> [(Int, Vector R)]
 convertTests (MnistData src) =
   map (bimap fromIntegral $ (/ 255) . flatten . fromZ) src
 
-trainingSimple :: (ForwardLayer a R, OutputLayer b R)
-     Double
+
+trainingSimple ::
+     ( Output (Backput b R) ~ b
+     , Forward (Backward a R) ~ a
+     , ForwardLayer a R
+     , OutputLayer b R
+     , BackwardLayer (Backward a R) R
+     , BackputLayer (Backput b R) R
+     )
+  => R
   -> Int
   -> Int
   -> ForwardNN a b
   -> MnistData
   -> MnistData
-  -> ([Double], Double)
+  -> ([R], Double)
 trainingSimple rate batchSize nReplicate nn trainData testData =
   (losses, evaluate layers $ convertTests testData)
   where

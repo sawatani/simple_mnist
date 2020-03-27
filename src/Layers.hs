@@ -65,74 +65,73 @@ newtype TrainBatch a =
 {-
 Forward Layers
 -}
-class ForwardLayer (a :: * -> *) e where
-  type Backward a :: * -> *
-  forward :: NElement e => a e -> SignalX e -> (Backward a e, SignalY e)
-
-class OutputLayer (o :: * -> *) e where
-  type Backput o :: * -> *
-  output :: NElement e => o e -> TeacherBatch e -> SignalY e -> (Backput o e, e)
+class ForwardLayer a e where
+  type Backward a e :: *
+  forward :: NElement e => a -> SignalX e -> (Backward a e, SignalY e)
+  (~>) :: x -> a -> y
+  x ~> a = JoinedForwardLayer x a
 
 infixl 4 ~>
 
-(~>) ::
-     (ForwardLayer a e, ForwardLayer b e, ForwardLayer c e) => a e -> b e -> c e
-a ~> (JoinedForwardLayer x y) = (a ~> x) ~> y
-a ~> b = JoinedForwardLayer a b
+class OutputLayer o e where
+  type Backput o e :: *
+  output :: NElement e => o -> TeacherBatch e -> SignalY e -> (Backput o e, e)
 
 data AffineForward e =
   AffineForward (Weight e) (Bias e)
   deriving (Show)
 
-data SigmoidForward e =
+data SigmoidForward =
   SigmoidForward
   deriving (Show, Eq)
 
-data ReLUForward e =
+data ReLUForward =
   ReLUForward
   deriving (Show, Eq)
 
-data JoinedForwardLayer a b e =
-  JoinedForwardLayer (a e) (b e)
+data JoinedForwardLayer a b =
+  JoinedForwardLayer a b
+  deriving (Show)
 
-data SoftmaxWithCrossForward e =
+data SoftmaxWithCrossForward =
   SoftmaxWithCrossForward
-  deriving (Show)
+  deriving (Show, Eq)
 
-data ForwardNN a b e =
-  ForwardNN (a e) (b e)
-  deriving (Show)
+data ForwardNN a b =
+  ForwardNN a b
+  deriving (Show, Eq)
 
-instance ForwardLayer AffineForward e where
-  type Backward AffineForward = AffineBackward
+instance ForwardLayer (AffineForward e) e where
+  type Backward (AffineForward e) e = AffineBackward e
   forward (AffineForward w b) x = (AffineBackward w b x, affinem w b x)
 
 instance ForwardLayer SigmoidForward e where
-  type Backward SigmoidForward = SigmoidBackward
+  type Backward SigmoidForward e = SigmoidBackward e
   forward SigmoidForward x = (SigmoidBackward y, y)
     where
       y = sigmoidm x
 
 instance ForwardLayer ReLUForward e where
-  type Backward ReLUForward = ReLUBackward
+  type Backward ReLUForward e = ReLUBackward e
   forward ReLUForward x = (ReLUBackward x, relum x)
 
 instance (ForwardLayer a e, ForwardLayer b e) =>
          ForwardLayer (JoinedForwardLayer a b) e where
-  type Backward (JoinedForwardLayer a b) = JoinedBackwardLayer (Backward a) (Backward b)
+  type Backward (JoinedForwardLayer a b) e = JoinedBackwardLayer (Backward a e) (Backward b e)
   forward (JoinedForwardLayer a b) x0 = (a' <~ b', x2)
     where
       (a', x1) = forward a x0
       (b', x2) = forward b x1
+  o ~> (JoinedForwardLayer x y) = (o ~> x) ~> y
 
 instance (Numeric e, Eq e) => Eq (AffineForward e) where
   AffineForward w b == AffineForward w' b' = w == w' && b == b'
 
-instance (Eq (a e), Eq (b e)) => Eq (JoinedForwardLayer a b e) where
+instance (Eq a, Eq b) => Eq (JoinedForwardLayer a b) where
   JoinedForwardLayer a b == JoinedForwardLayer a' b' = a == a' && b == b'
 
 instance OutputLayer SoftmaxWithCrossForward e where
-  type Backput SoftmaxWithCrossForward = SoftmaxWithCrossBackward
+  type Backput SoftmaxWithCrossForward e = SoftmaxWithCrossBackward e
   output SoftmaxWithCrossForward t y = (SoftmaxWithCrossBackward t y', loss)
     where
       (y', loss) = softmaxWithCross t y
@@ -140,23 +139,18 @@ instance OutputLayer SoftmaxWithCrossForward e where
 {-
 Backward Layers
 -}
-class BackwardLayer (b :: * -> *) e where
-  type Forward b :: * -> *
-  backward :: NElement e => e -> b e -> Diff e -> (Forward b e, Diff e)
+class BackwardLayer b e where
+  type Forward b :: *
+  backward :: NElement e => e -> b -> Diff e -> (Forward b, Diff e)
+  (<~) :: a -> x -> y
+  a <~ x = JoinedBackwardLayer a x
 
-class BackputLayer (b :: * -> *) e where
-  type Output b e :: *
-  backput :: NElement e => b e -> (Output b e, Diff e)
+class BackputLayer b e where
+  type Output b :: *
+  backput :: NElement e => b -> (Output b, Diff e)
 
 infixr 4 <~
 
-(<~) ::
-     (BackwardLayer a e, BackwardLayer b e, BackwardLayer c e)
-  => a e
-  -> b e
-  -> c e
-(JoinedBackwardLayer x y) <~ b = x <~ (y <~ b)
-a <~ b = JoinedBackwardLayer a b
 
 data AffineBackward e =
   AffineBackward (Weight e) (Bias e) (SignalX e)
@@ -170,28 +164,31 @@ data ReLUBackward e =
   ReLUBackward (SignalX e)
   deriving (Show)
 
-data JoinedBackwardLayer a b e =
-  JoinedBackwardLayer (a e) (b e)
+data JoinedBackwardLayer a b =
+  JoinedBackwardLayer a b
+  deriving (Show)
 
 data SoftmaxWithCrossBackward e =
   SoftmaxWithCrossBackward (TeacherBatch e) (SignalY e)
+  deriving (Show)
 
-data BackwardNN a b e =
-  BackwardNN (a e) (b e)
+data BackwardNN a b =
+  BackwardNN a b
+  deriving (Show, Eq)
 
-instance BackwardLayer AffineBackward e where
-  type Forward AffineBackward = AffineForward
+instance BackwardLayer (AffineBackward e) e where
+  type Forward (AffineBackward e) = AffineForward e
   backward rate (AffineBackward w b x) d =
     (AffineForward (w - scale rate w') (b - scale rate b'), x')
     where
       (x', w', b') = affinemBackward w x d
 
-instance BackwardLayer SigmoidBackward e where
-  type Forward SigmoidBackward = SigmoidForward
+instance BackwardLayer (SigmoidBackward e) e where
+  type Forward (SigmoidBackward e) = SigmoidForward
   backward _ (SigmoidBackward y) d = (SigmoidForward, sigmoidBackward y d)
 
-instance BackwardLayer ReLUBackward e where
-  type Forward ReLUBackward = ReLUForward
+instance BackwardLayer (ReLUBackward e) e where
+  type Forward (ReLUBackward e) = ReLUForward
   backward _ (ReLUBackward x) d = (ReLUForward, relumBackward x d)
 
 instance (BackwardLayer a e, BackwardLayer b e) =>
@@ -201,6 +198,7 @@ instance (BackwardLayer a e, BackwardLayer b e) =>
     where
       (b', d1) = backward r b d0
       (a', d2) = backward r a d1
+  (JoinedBackwardLayer x y) <~ b = x <~ (y <~ b)
 
 instance (Numeric e, Eq e) => Eq (AffineBackward e) where
   AffineBackward w b d == AffineBackward w' b' d' =
@@ -212,11 +210,11 @@ instance (Numeric e, Eq e) => Eq (SigmoidBackward e) where
 instance (Numeric e, Eq e) => Eq (ReLUBackward e) where
   ReLUBackward x == ReLUBackward x' = x == x'
 
-instance (Eq (a e), Eq (b e)) => Eq (JoinedBackwardLayer a b e) where
+instance (Eq a, Eq b) => Eq (JoinedBackwardLayer a b) where
   JoinedBackwardLayer a b == JoinedBackwardLayer a' b' = a == a' && b == b'
 
-instance BackputLayer SoftmaxWithCrossBackward e where
-  type Output SoftmaxWithCrossBackward e = SoftmaxWithCrossForward e
+instance BackputLayer (SoftmaxWithCrossBackward e) e where
+  type Output (SoftmaxWithCrossBackward e) = SoftmaxWithCrossForward
   backput (SoftmaxWithCrossBackward t y) =
     (SoftmaxWithCrossForward, softmaxWithCrossBackward t y)
 
@@ -230,9 +228,9 @@ learnForward ::
      , BackwardLayer a' e
      , BackputLayer b' e
      )
-  => ForwardNN a b e
+  => ForwardNN a b
   -> TrainBatch e
-  -> (BackwardNN a' b' e, e)
+  -> (BackwardNN a' b', e)
 learnForward (ForwardNN layers loss) (TrainBatch (t, x)) =
   result `seq` (BackwardNN layers' loss', result)
   where
@@ -247,8 +245,8 @@ learnBackward ::
      , BackputLayer b' e
      )
   => e
-  -> BackwardNN a' b' e
-  -> ForwardNN a b e
+  -> BackwardNN a' b'
+  -> ForwardNN a b
 learnBackward rate (BackwardNN layers loss) = ForwardNN layers' loss'
   where
     (loss', d) = backput loss
@@ -257,17 +255,17 @@ learnBackward rate (BackwardNN layers loss) = ForwardNN layers' loss'
 learn ::
      (NElement e, ForwardLayer a e, OutputLayer b e)
   => e
-  -> ForwardNN a b e
+  -> ForwardNN a b
   -> TrainBatch e
-  -> (ForwardNN a b e, e)
+  -> (ForwardNN a b, e)
 learn rate a = first (learnBackward rate) . learnForward a
 
 learnAll ::
      (NElement e, ForwardLayer a e, OutputLayer b e)
   => e
-  -> ForwardNN a b e
+  -> ForwardNN a b
   -> [TrainBatch e]
-  -> (ForwardNN a b e, [e])
+  -> (ForwardNN a b, [e])
 learnAll rate origin batches = ls `seq` (nn, ls)
   where
     (nn, ls) = foldr f (origin, []) batches
@@ -275,10 +273,10 @@ learnAll rate origin batches = ls `seq` (nn, ls)
     x ~: xs = trace [i|[#{length xs + 1}/#{n}] #{show x}|] (x : xs)
     n = length batches
 
-predict :: (NElement e, ForwardLayer a e) => a e -> Vector e -> Int
+predict :: (NElement e, ForwardLayer a e) => a -> Vector e -> Int
 predict layers = maxIndex . flatten . snd . forward layers . asRow
 
-evaluate :: (NElement e, ForwardLayer a e) => a e -> [(Int, Vector e)] -> Double
+evaluate :: (NElement e, ForwardLayer a e) => a -> [(Int, Vector e)] -> Double
 evaluate layers samples = fromIntegral nOk / fromIntegral (length samples)
   where
     nOk = length $ filter (uncurry (==)) results

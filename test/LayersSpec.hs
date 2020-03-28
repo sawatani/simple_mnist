@@ -23,40 +23,11 @@ runTest = hspec spec
 
 spec :: Spec
 spec = do
-  describe "predict" propsPredict
-  describe "evaluate" propsEvaluate
   describe "Affine" propsAffine
   describe "Sigmoid" propsSigmoid
   describe "ReLU" propsReLU
   describe "Joined" propsJoined
   describe "Matrix" propsMatrix
-
-propsPredict =
-  prop "index" $
-  forAll (genVectorN 100) $ \v ->
-    let r = predict ReLUForward v
-        a = maxIndex v
-     in r `shouldBe` a
-
-propsEvaluate = do
-  prop "100%" $
-    forAll (vectorOf 100 $ genVectorN 100) $ \vs ->
-      let ns = map maxIndex vs
-          r = evaluate ReLUForward $ zip ns vs
-       in r `shouldBe` 1
-  prop "0%" $
-    forAll (vectorOf 100 $ genVectorN 100) $ \vs ->
-      let ns = map ((+ 1) . maxIndex) vs
-          r = evaluate ReLUForward $ zip ns vs
-       in r `shouldBe` 0
-  prop "50%" $
-    forAll (vectorOf 100 $ genVectorN 100) $ \vs ->
-      let (vA, vB) = splitAt 50 vs
-          nA = map maxIndex vA
-          nB = map ((+ 1) . maxIndex) vB
-          ns = nA ++ nB
-          r = evaluate ReLUForward $ zip ns vs
-       in r `shouldBe` 0.5
 
 propsAffine = do
   prop "forward" $

@@ -1,6 +1,5 @@
 {-# LANGUAGE ConstraintKinds  #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE QuasiQuotes      #-}
 
 module Layers
   ( ForwardLayer(..)
@@ -17,17 +16,10 @@ module Layers
   , output
   , backward
   , backput
-  , learnForward
-  , learnBackward
-  , learn
-  , learnAll
-  , predict
-  , evaluate
   ) where
 
 import           Control.Arrow
-import           Control.Lens            hiding ((<~))
-import           Data.String.Interpolate as S (i)
+import           Control.Lens          hiding ((<~))
 import           Debug.Trace
 import           Numeric
 import           Numeric.LinearAlgebra
@@ -146,37 +138,3 @@ output SoftmaxWithCrossForward t y = (SoftmaxWithCrossBackward t y', loss)
 backput :: NElement a => BackputLayer a -> (OutputLayer a, Diff a)
 backput (SoftmaxWithCrossBackward t y) =
   (SoftmaxWithCrossForward, softmaxWithCrossBackward t y)
-
-learnForward :: NElement a => ForwardNN a -> TrainBatch a -> (BackwardNN a, a)
-learnForward (ForwardNN layers loss) (TrainBatch (t, x)) =
-  result `seq` (BackwardNN layers' loss', result)
-  where
-    (layers', y) = forward layers x
-    (loss', result) = output loss t y
-
-learnBackward :: NElement a => a -> BackwardNN a -> ForwardNN a
-learnBackward rate (BackwardNN layers loss) = ForwardNN layers' loss'
-  where
-    (loss', d) = backput loss
-    (layers', _) = backward rate layers d
-
-learn :: NElement a => a -> ForwardNN a -> TrainBatch a -> (ForwardNN a, a)
-learn rate a = first (learnBackward rate) . learnForward a
-
-learnAll ::
-     NElement a => a -> ForwardNN a -> [TrainBatch a] -> (ForwardNN a, [a])
-learnAll rate origin batches = ls `seq` (nn, ls)
-  where
-    (nn, ls) = foldr f (origin, []) batches
-    f batch (a, ls) = ls `seq` second (~: ls) $ learn rate a batch
-    x ~: xs = trace [i|[#{length xs + 1}/#{n}] #{show x}|] (x : xs)
-    n = length batches
-
-predict :: NElement a => ForwardLayer a -> Vector a -> Int
-predict layers = maxIndex . flatten . snd . forward layers . asRow
-
-evaluate :: NElement a => ForwardLayer a -> [(Int, Vector a)] -> Double
-evaluate layers samples = fromIntegral nOk / fromIntegral (length samples)
-  where
-    nOk = length $ filter (uncurry (==)) results
-    results = map (second $ predict layers) samples

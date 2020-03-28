@@ -4,7 +4,6 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE InstanceSigs          #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE QuasiQuotes           #-}
 {-# LANGUAGE TypeFamilies          #-}
 
 module Layers
@@ -15,29 +14,22 @@ module Layers
   , BackputLayer(..)
   , BackwardNN(..)
   , AffineForward(..)
-  , SigmoidForward(..)
-  , ReLUForward(..)
-  , JoinedForwardLayer(..)
-  , SoftmaxWithCrossForward(..)
   , AffineBackward(..)
+  , SigmoidForward(..)
   , SigmoidBackward(..)
+  , ReLUForward(..)
   , ReLUBackward(..)
+  , JoinedForwardLayer(..)
   , JoinedBackwardLayer(..)
+  , SoftmaxWithCrossForward(..)
   , TrainBatch(..)
   , NElement(..)
   , (<~)
   , (~>)
-  , learnForward
-  , learnBackward
-  , learn
-  , learnAll
-  , predict
-  , evaluate
   ) where
 
 import           Control.Arrow
-import           Control.Lens            hiding ((<~))
-import           Data.String.Interpolate as S (i)
+import           Control.Lens          hiding ((<~))
 import           Debug.Trace
 import           Numeric
 import           Numeric.LinearAlgebra
@@ -67,24 +59,48 @@ data AffineForward e =
   AffineForward (Weight e) (Bias e)
   deriving (Show)
 
+data AffineBackward e =
+  AffineBackward (Weight e) (Bias e) (SignalX e)
+  deriving (Show)
+
 data SigmoidForward =
   SigmoidForward
   deriving (Show, Eq)
+
+newtype SigmoidBackward e =
+  SigmoidBackward (SignalY e)
+  deriving (Show)
 
 data ReLUForward =
   ReLUForward
   deriving (Show, Eq)
 
+newtype ReLUBackward e =
+  ReLUBackward (SignalX e)
+  deriving (Show)
+
 data JoinedForwardLayer a b =
   JoinedForwardLayer a b
+  deriving (Show)
+
+data JoinedBackwardLayer a b =
+  JoinedBackwardLayer a b
   deriving (Show)
 
 data SoftmaxWithCrossForward =
   SoftmaxWithCrossForward
   deriving (Show, Eq)
 
+data SoftmaxWithCrossBackward e =
+  SoftmaxWithCrossBackward (TeacherBatch e) (SignalY e)
+  deriving (Show)
+
 data ForwardNN a b =
   ForwardNN a b
+  deriving (Show, Eq)
+
+data BackwardNN a b =
+  BackwardNN a b
   deriving (Show, Eq)
 
 {-
@@ -95,6 +111,7 @@ class ForwardLayer a e where
   forward :: NElement e => a -> SignalX e -> (Backward a e, SignalY e)
 
 infixr 4 ~>
+
 a ~> b = JoinedForwardLayer a b
 
 class OutputLayer o e where
@@ -147,31 +164,8 @@ class BackputLayer b e where
   backput :: NElement e => b -> (Output b, Diff e)
 
 infixl 4 <~
+
 a <~ b = JoinedBackwardLayer a b
-
-data AffineBackward e =
-  AffineBackward (Weight e) (Bias e) (SignalX e)
-  deriving (Show)
-
-newtype SigmoidBackward e =
-  SigmoidBackward (SignalY e)
-  deriving (Show)
-
-newtype ReLUBackward e =
-  ReLUBackward (SignalX e)
-  deriving (Show)
-
-data JoinedBackwardLayer a b =
-  JoinedBackwardLayer a b
-  deriving (Show)
-
-data SoftmaxWithCrossBackward e =
-  SoftmaxWithCrossBackward (TeacherBatch e) (SignalY e)
-  deriving (Show)
-
-data BackwardNN a b =
-  BackwardNN a b
-  deriving (Show, Eq)
 
 instance BackwardLayer (AffineBackward e) e where
   type Forward (AffineBackward e) = AffineForward e
@@ -213,62 +207,3 @@ instance BackputLayer (SoftmaxWithCrossBackward e) e where
   type Output (SoftmaxWithCrossBackward e) = SoftmaxWithCrossForward
   backput (SoftmaxWithCrossBackward t y) =
     (SoftmaxWithCrossForward, softmaxWithCrossBackward t y)
-
-{-
-Learning
--}
-learnForward ::
-     ( NElement e
-     , ForwardLayer a e
-     , OutputLayer b e
-     )
-  => ForwardNN a b
-  -> TrainBatch e
-  -> (BackwardNN (Backward a e) (Backput b e), e)
-learnForward (ForwardNN layers loss) (TrainBatch (t, x)) =
-  result `seq` (BackwardNN layers' loss', result)
-  where
-    (layers', y) = forward layers x
-    (loss', result) = output loss t y
-
-learnBackward ::
-     ( NElement e
-     , BackwardLayer a' e
-     , BackputLayer b' e
-     )
-  => e
-  -> BackwardNN a' b'
-  -> ForwardNN (Forward a') (Output b')
-learnBackward rate (BackwardNN layers loss) = ForwardNN layers' loss'
-  where
-    (loss', d) = backput loss
-    (layers', _) = backward rate layers d
-
-learn ::
-     ( NElement e
-     , ForwardLayer a e
-     , OutputLayer b e
-     , BackwardLayer (Backward a e) e
-     , BackputLayer (Backput b e) e
-     )
-  => e
-  -> ForwardNN a b
-  -> TrainBatch e
-  -> (ForwardNN (Forward (Backward a e)) (Output (Backput b e)), e)
-learn rate a = first (learnBackward rate) . learnForward a
-
-learnAll rate origin batches = ls `seq` (nn, ls)
-  where
-    (nn, ls) = foldr f (origin, []) batches
-    f batch (a, ls) = ls `seq` second (~: ls) $ learn rate a batch
-    x ~: xs = trace [i|[#{length xs + 1}/#{n}] #{show x}|] (x : xs)
-    n = length batches
-
-predict :: (NElement e, ForwardLayer a e) => a -> Vector e -> Int
-predict layers = maxIndex . flatten . snd . forward layers . asRow
-
-evaluate :: (NElement e, ForwardLayer a e) => a -> [(Int, Vector e)] -> Double
-evaluate layers samples = fromIntegral nOk / fromIntegral (length samples)
-  where
-    nOk = length $ filter (uncurry (==)) results
-    results = map (second $ predict layers) samples

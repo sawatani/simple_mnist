@@ -57,10 +57,10 @@ instance (Numeric a, Eq a) => Eq (ForwardLayer a) where
   JoinedForwardLayer a b == JoinedForwardLayer a' b' = a == a' && b == b'
   _ == _ = False
 
-infixl 4 ~>
+infixr 4 ~>
 
 (~>) :: ForwardLayer a -> ForwardLayer a -> ForwardLayer a
-a ~> (JoinedForwardLayer x y) = (a ~> x) ~> y
+(JoinedForwardLayer x y) ~> a = x ~> y ~> a
 a ~> b = JoinedForwardLayer a b
 
 data OutputLayer a =
@@ -86,10 +86,10 @@ instance (Numeric a, Eq a) => Eq (BackwardLayer a) where
   JoinedBackwardLayer a b == JoinedBackwardLayer a' b' = a == a' && b == b'
   _ == _ = False
 
-infixr 4 <~
+infixl 4 <~
 
 (<~) :: BackwardLayer a -> BackwardLayer a -> BackwardLayer a
-(JoinedBackwardLayer x y) <~ b = x <~ (y <~ b)
+b <~ (JoinedBackwardLayer x y) = b <~ x <~ y
 a <~ b = JoinedBackwardLayer a b
 
 data BackputLayer a =

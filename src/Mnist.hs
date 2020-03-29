@@ -63,15 +63,15 @@ instance B.Binary MnistLabels where
     size <- getAsIntegral
     let total = trace ("Reading labels: " ++ show size) size
     labels <- BGI.readN total BSS.unpack
-    return $ MnistLabels $ labels
+    return $ MnistLabels labels
 
 instance B.Binary MnistImages where
-  put (MnistImages (images@(hm:_))) = do
+  put (MnistImages images@(hm:_)) = do
     putAsWord32 markMnistImages
     putAsWord32 $ length images
     putAsWord32 $ rows hm
     putAsWord32 $ cols hm
-    B.put $ (BS.pack . map fromIntegral . concat . concat . map toLists) images
+    B.put $ (BS.pack . map fromIntegral . concat . concatMap toLists) images
   get = do
     mark <- getAsIntegral
     guard $ mark == markMnistImages
@@ -112,7 +112,7 @@ saveMnist rootDir urlBase filenames manager = do
       e <- doesFileExist file
       if e
         then return ()
-        else download manager url >>= (BS.writeFile file)
+        else download manager url >>= BS.writeFile file
       return file
 
 readMnist :: FilePath -> IO (Either MnistLabels MnistImages)

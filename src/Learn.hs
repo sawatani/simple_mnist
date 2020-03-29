@@ -45,8 +45,10 @@ learnAll ::
 learnAll rate origin batches = ls `seq` (nn, ls)
   where
     (nn, ls) = foldr f (origin, []) batches
-    f batch (a, ls) = ls `seq` second (~: ls) $ learn rate a batch
-    x ~: xs = trace [i|[#{length xs + 1}/#{n}] #{show x}|] (x : xs)
+    f batch (a, ls) = second (~: ls) $ learn rate a batch
+    x ~: xs =
+      let r = (x : xs)
+       in trace [i|[#{length r}/#{n}] #{show x}|] r
     n = length batches
 
 predict :: NElement a => ForwardLayer a -> Vector a -> Int

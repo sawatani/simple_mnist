@@ -1,7 +1,10 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 module Main where
 
 import           Control.Lens
 import           Data.List
+import           Data.String.Interpolate as S (i)
 import           Layers
 import           Learn
 import           Mnist
@@ -38,6 +41,6 @@ doLearn =
     origin <- initNN ReLUForward [28 * 28, 50, 10]
     let (losses, result) = trainingSimple 0.1 1000 1000 origin trainers tests
     timestamp "Start training"
-    timestamp $ "result=" ++ show (result * 100) ++ "%"
+    timestamp [i|result=#{result * 100}%|]
     saveCSV ".lean_result.csv" ["index", "loss"] $
       map (^.. each) $ [0 ..] `zip` reverse losses

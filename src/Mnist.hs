@@ -1,3 +1,5 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 module Mnist
   ( MnistData(..)
   , MnistLabels(..)
@@ -17,6 +19,7 @@ import qualified Data.ByteString            as BSS
 import qualified Data.ByteString.Lazy       as BS
 import qualified Data.ByteString.Lazy.UTF8  as UTF8
 import           Data.List.Split
+import           Data.String.Interpolate    as S (i)
 import           Debug.Trace
 import           Network.HTTP.Client
 import           Numeric.LinearAlgebra.Data
@@ -61,7 +64,7 @@ instance B.Binary MnistLabels where
     mark <- getAsIntegral
     guard $ mark == markMinistLabels
     size <- getAsIntegral
-    let total = trace ("Reading labels: " ++ show size) size
+    let total = trace [i|Reading labels: #{size}|] size
     labels <- BGI.readN total BSS.unpack
     return $ MnistLabels labels
 
@@ -79,12 +82,8 @@ instance B.Binary MnistImages where
     nRows <- getAsIntegral
     nCols <- getAsIntegral
     let total =
-          trace
-            ("Reading images: " ++
-             show size ++ " of " ++ show nRows ++ "x" ++ show nCols)
-            size *
-          nRows *
-          nCols
+          trace [i|"Reading images: #{size} of #{nRows} x #{nCols}|] $
+          size * nRows * nCols
     zs <- map fromIntegral <$> BGI.readN total BSS.unpack
     let images = map (nRows >< nCols) $ chunksOf (nRows * nCols) zs
     return $ MnistImages images
@@ -92,7 +91,7 @@ instance B.Binary MnistImages where
 download :: Manager -> String -> IO BS.ByteString
 download manager url = do
   request <- parseRequest url
-  timestamp $ "Downloading " ++ url
+  timestamp [i|Downloading #{url}|]
   response <- httpLbs request manager
   return $ responseBody response
 
@@ -108,7 +107,7 @@ saveMnist rootDir urlBase filenames manager = do
     saveFile filename = do
       let url = urlBase ++ filename
       let file = rootDir </> filename
-      timestamp $ "Checking file " ++ file
+      timestamp [i|Checking file ${file}|]
       e <- doesFileExist file
       if e
         then return ()
@@ -117,9 +116,9 @@ saveMnist rootDir urlBase filenames manager = do
 
 readMnist :: FilePath -> IO (Either MnistLabels MnistImages)
 readMnist file = do
-  timestamp $ "decoding " ++ file ++ " ..."
+  timestamp [i|decoding #{file} ...|]
   bs <- GZip.decompress <$> BS.readFile file
   let a =
         left (const $ B.decode bs) $ right (\(_, _, a) -> a) $ B.decodeOrFail bs
-  timestamp $ "decoded " ++ file
+  timestamp [i|decoded #{file}|]
   return a

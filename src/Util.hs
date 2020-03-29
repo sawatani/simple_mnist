@@ -26,13 +26,12 @@ shuffleList xs =
     return $ VG.toList v'
   where
     n = Prelude.length xs - 1
-    repeatSwap v g i =
-      if (i < 0)
-        then return ()
-        else do
-          j <- uniformR (0, n) g
-          VM.swap v j i
-          repeatSwap v g (i - 1)
+    repeatSwap v g i
+      | i < 0 = return ()
+      | otherwise = do
+        j <- uniformR (0, n) g
+        VM.swap v j i
+        repeatSwap v g (i - 1)
 
 saveCSV :: Show a => FilePath -> [String] -> [[a]] -> IO ()
 saveCSV filePath columnNames body = BS.writeFile filePath buf

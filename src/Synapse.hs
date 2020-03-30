@@ -121,3 +121,61 @@ affinemBackward w x d = (dx, dw, db)
     dx = d <> tr w
     dw = tr x <> d
     db = fromList $ sumElements `map` toColumns d
+
+batchNorm :: (Floating a, Numeric a, Num (Vector a)) => Vector a -> Vector a
+batchNorm v = cmap f v
+  where
+    f x = (x - average) / b
+    b = sqrt vari + small
+    vari = sumElements ((v - scalar average) ^ 2) / m
+    average = sumElements v / m
+    m = fromIntegral $ size v
+    small = 1e-10
+
+batchNormm :: (Floating a, Numeric a, Num (Vector a)) => Matrix a -> Matrix a
+batchNormm = fromRows . map batchNorm . toRows
+
+batchNormmBackward ::
+     ( Floating a
+     , Numeric a
+     , Num (Vector a)
+     , Floating (Vector a)
+     , Container Vector a
+     )
+  => Matrix a
+  -> Matrix a
+  -> Matrix a
+  -> Matrix a
+  -> Matrix a
+  -> Vector a
+  -> Vector a
+  -> Matrix a
+batchNormmBackward dout xhat gamma ivar xmu sqrtvar var = dx
+  where
+    (nRows, nCols) = size dout
+    small = 1e-10
+    sum0 m = fromList $ sumElements `map` toColumns m
+    spawnRows r = fromRows $ replicate nRows (r / fromIntegral nRows)
+    -- step 9
+    beta = sum0 dout
+    -- step 8
+    dgamma = sum0 $ dout * xhat
+    dxhat = dout * gamma
+    -- step 7
+    dxmu1 = dxhat * ivar
+    divar = sum0 $ dxhat * xmu
+    -- step 6
+    dsqrtvar = (-1 / (sqrtvar ^ 2)) * divar
+    -- step 5
+    dvar = (1 / sqrt (var + small)) * dsqrtvar * 0.5
+    -- step 4
+    dsq = spawnRows dvar
+    -- step 3
+    dxmu2 = xmu * dsq * 2
+    -- step 2
+    dx1 = dxmu1 + dxmu2
+    dmu = negate `cmap` sum0 dx1
+    -- step 1
+    dx2 = spawnRows dmu
+    -- step 0
+    dx = dx1 + dx2

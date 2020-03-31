@@ -38,9 +38,13 @@ doLearn =
           map (\[Right a, Left b] -> b `zipMnist` a) $ chunksOf 2 ms
     trainers <- MnistData <$> shuffleList (take 60000 srcTrains)
     tests <- MnistData <$> shuffleList (take 10000 srcTests)
-    origin <- initNN ReLUForward [28 * 28, 50, 10]
+    origin <- initNN genAfterLayer [28 * 28, 50, 10]
     let (losses, result) = trainingSimple 0.1 1000 1000 origin trainers tests
     timestamp "Start training"
     timestamp [i|result=#{result * 100}%|]
     saveCSV ".lean_result.csv" ["index", "loss"] $
       map (^.. each) $ [0 ..] `zip` reverse losses
+  where
+    genAfterLayer n = do
+      bn <- genBatchNorm n
+      return $ bn ~> ReLUForward

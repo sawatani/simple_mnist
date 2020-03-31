@@ -46,6 +46,7 @@ newtype TrainBatch a =
 data Numeric a =>
      ForwardLayer a
   = AffineForward (Weight a) (Bias a)
+  | BatchNormForward (BatchNormParam a)
   | SigmoidForward
   | ReLUForward
   | JoinedForwardLayer (ForwardLayer a) (ForwardLayer a)
@@ -68,6 +69,7 @@ data ForwardNN a =
 data Numeric a =>
      BackwardLayer a
   = AffineBackward (Weight a) (Bias a) (SignalX a)
+  | BatchNormBackward (BatchNormParam a) (BatchNormCache a)
   | SigmoidBackward (SignalY a)
   | ReLUBackward (SignalX a)
   | JoinedBackwardLayer (BackwardLayer a) (BackwardLayer a)
@@ -79,7 +81,8 @@ infixl 4 <~
 b <~ (JoinedBackwardLayer x y) = b <~ x <~ y
 a <~ b = JoinedBackwardLayer a b
 
-data Numeric a => BackputLayer a =
+data Numeric a =>
+     BackputLayer a =
   SoftmaxWithCrossBackward (TeacherBatch a) (SignalY a)
   deriving (Show, Eq)
 
@@ -87,11 +90,15 @@ data BackwardNN a =
   BackwardNN (BackwardLayer a) (BackputLayer a)
   deriving (Show, Eq)
 
-type NElement a = (Ord a, Floating a, Numeric a, Num (Vector a), Show a)
+type NElement a
+   = (Ord a, Floating a, Numeric a, Floating (Vector a), Num (Vector a), Show a)
 
 forward ::
      NElement a => ForwardLayer a -> SignalX a -> (BackwardLayer a, SignalY a)
 forward (AffineForward w b) x = (AffineBackward w b x, affinem w b x)
+forward (BatchNormForward param) x = (BatchNormBackward param cache, out)
+  where
+    (cache, out) = batchNormm param x
 forward SigmoidForward x = (SigmoidBackward y, y)
   where
     y = sigmoidm x
@@ -107,6 +114,11 @@ backward rate (AffineBackward w b x) d =
   (AffineForward (w - scale rate w') (b - scale rate b'), x')
   where
     (x', w', b') = affinemBackward w x d
+backward rate (BatchNormBackward (BatchNormParam gamma beta) cache) d =
+  (BatchNormForward param, d')
+  where
+    param = BatchNormParam (gamma - scale rate dgamma) (beta - scale rate dbeta)
+    (dgamma, dbeta, d') = batchNormmBackward cache d
 backward _ (SigmoidBackward y) d = (SigmoidForward, sigmoidBackward y d)
 backward _ (ReLUBackward x) d = (ReLUForward, relumBackward x d)
 backward r (JoinedBackwardLayer a b) d0 = (a' ~> b', d2)

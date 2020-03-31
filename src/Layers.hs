@@ -43,60 +43,49 @@ newtype TrainBatch a =
   TrainBatch (TeacherBatch a, InputBatch a)
   deriving (Show)
 
-data ForwardLayer a
+data Numeric a =>
+     ForwardLayer a
   = AffineForward (Weight a) (Bias a)
   | SigmoidForward
   | ReLUForward
   | JoinedForwardLayer (ForwardLayer a) (ForwardLayer a)
-  deriving (Show)
-
-instance (Numeric a, Eq a) => Eq (ForwardLayer a) where
-  AffineForward w b == AffineForward w' b' = w == w' && b == b'
-  SigmoidForward == SigmoidForward = True
-  ReLUForward == ReLUForward = True
-  JoinedForwardLayer a b == JoinedForwardLayer a' b' = a == a' && b == b'
-  _ == _ = False
+  deriving (Show, Eq)
 
 infixr 4 ~>
 
-(~>) :: ForwardLayer a -> ForwardLayer a -> ForwardLayer a
+(~>) :: Numeric a => ForwardLayer a -> ForwardLayer a -> ForwardLayer a
 (JoinedForwardLayer x y) ~> a = x ~> y ~> a
 a ~> b = JoinedForwardLayer a b
 
 data OutputLayer a =
   SoftmaxWithCrossForward
-  deriving (Show)
+  deriving (Show, Eq)
 
 data ForwardNN a =
   ForwardNN (ForwardLayer a) (OutputLayer a)
-  deriving (Show)
+  deriving (Show, Eq)
 
-data BackwardLayer a
+data Numeric a =>
+     BackwardLayer a
   = AffineBackward (Weight a) (Bias a) (SignalX a)
   | SigmoidBackward (SignalY a)
   | ReLUBackward (SignalX a)
   | JoinedBackwardLayer (BackwardLayer a) (BackwardLayer a)
-  deriving (Show)
-
-instance (Numeric a, Eq a) => Eq (BackwardLayer a) where
-  AffineBackward w b d == AffineBackward w' b' d' =
-    w == w' && b == b' && d == d'
-  SigmoidBackward y == SigmoidBackward y' = y == y'
-  ReLUBackward x == ReLUBackward x' = x == x'
-  JoinedBackwardLayer a b == JoinedBackwardLayer a' b' = a == a' && b == b'
-  _ == _ = False
+  deriving (Show, Eq)
 
 infixl 4 <~
 
-(<~) :: BackwardLayer a -> BackwardLayer a -> BackwardLayer a
+(<~) :: Numeric a => BackwardLayer a -> BackwardLayer a -> BackwardLayer a
 b <~ (JoinedBackwardLayer x y) = b <~ x <~ y
 a <~ b = JoinedBackwardLayer a b
 
-data BackputLayer a =
+data Numeric a => BackputLayer a =
   SoftmaxWithCrossBackward (TeacherBatch a) (SignalY a)
+  deriving (Show, Eq)
 
 data BackwardNN a =
   BackwardNN (BackwardLayer a) (BackputLayer a)
+  deriving (Show, Eq)
 
 type NElement a = (Ord a, Floating a, Numeric a, Num (Vector a), Show a)
 

@@ -16,6 +16,11 @@ module Synapse
   , crossEntropym
   , affinem
   , affinemBackward
+  , BatchNormParam(..)
+  , BatchNormCache(..)
+  , batchNorm
+  , batchNormm
+  , batchNormmBackward
   ) where
 
 import           Debug.Trace
@@ -122,6 +127,24 @@ affinemBackward w x d = (dx, dw, db)
     dw = tr x <> d
     db = fromList $ sumElements `map` toColumns d
 
+data Numeric a =>
+     BatchNormParam a =
+  BatchNormParam
+    (Vector a) -- ^ beta
+    (Vector a) -- ^ gamma
+  deriving (Show, Eq)
+
+data Numeric a =>
+     BatchNormCache a =
+  BatchNormCache
+    (Matrix a) -- ^ gamma
+    (Matrix a) -- ^ xhat
+    (Matrix a) -- ^ ivar
+    (Matrix a) -- ^ xmu
+    (Vector a) -- ^ sqrtvar
+    (Vector a) -- ^ var
+  deriving (Show, Eq)
+
 batchNorm :: (Floating a, Numeric a, Num (Vector a)) => Vector a -> Vector a
 batchNorm v = cmap f v
   where
@@ -132,8 +155,37 @@ batchNorm v = cmap f v
     m = fromIntegral $ size v
     small = 1e-10
 
-batchNormm :: (Floating a, Numeric a, Num (Vector a)) => Matrix a -> Matrix a
-batchNormm = fromRows . map batchNorm . toRows
+batchNormm ::
+     (Floating a, Numeric a, Num (Vector a))
+  => BatchNormParam a
+  -> Matrix a
+  -> (BatchNormCache a, Matrix a)
+batchNormm (BatchNormParam gamma beta) x =
+  (BatchNormCache gammam xhat ivar xmu sqrtvar var, out)
+  where
+    (nRows, nCols) = size x
+    epsilon = 1e-10
+    sum0 m = fromList $ sumElements `map` toColumns m
+    xRows v = fromRows $ replicate nRows v
+    -- step 1
+    mu = sum0 x / fromIntegral nRows
+    -- step 2
+    xmu = x - xRows mu
+    -- step 3
+    sq = xmu ^ 2
+    -- step 4
+    var = sum0 sq / fromIntegral nRows
+    -- step 5
+    sqrtvar = cmap (\a -> sqrt (a + epsilon)) var
+    -- step 6
+    ivar = xRows $ 1.0 / sqrtvar
+    -- step 7
+    xhat = xmu * ivar
+    -- step 8
+    gammam = xRows gamma
+    gammax = gammam * xhat
+    -- step 9
+    out = gammax + xRows beta
 
 batchNormmBackward ::
      ( Floating a
@@ -142,22 +194,18 @@ batchNormmBackward ::
      , Floating (Vector a)
      , Container Vector a
      )
-  => Matrix a
+  => BatchNormCache a
   -> Matrix a
-  -> Matrix a
-  -> Matrix a
-  -> Matrix a
-  -> Vector a
-  -> Vector a
-  -> Matrix a
-batchNormmBackward dout xhat gamma ivar xmu sqrtvar var = dx
+  -> (Vector a, Vector a, Matrix a)
+batchNormmBackward (BatchNormCache gamma xhat ivar xmu sqrtvar var) dout =
+  (dgamma, dbeta, dx)
   where
     (nRows, nCols) = size dout
-    small = 1e-10
+    epsilon = 1e-10
     sum0 m = fromList $ sumElements `map` toColumns m
     spawnRows r = fromRows $ replicate nRows (r / fromIntegral nRows)
     -- step 9
-    beta = sum0 dout
+    dbeta = sum0 dout
     -- step 8
     dgamma = sum0 $ dout * xhat
     dxhat = dout * gamma
@@ -167,7 +215,7 @@ batchNormmBackward dout xhat gamma ivar xmu sqrtvar var = dx
     -- step 6
     dsqrtvar = (-1 / (sqrtvar ^ 2)) * divar
     -- step 5
-    dvar = (1 / sqrt (var + small)) * dsqrtvar * 0.5
+    dvar = (1 / sqrt (var + epsilon)) * dsqrtvar * 0.5
     -- step 4
     dsq = spawnRows dvar
     -- step 3

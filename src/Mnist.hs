@@ -107,7 +107,7 @@ saveMnist rootDir urlBase filenames manager = do
     saveFile filename = do
       let url = urlBase ++ filename
       let file = rootDir </> filename
-      timestamp [i|Checking file ${file}|]
+      timestamp [i|Checking file #{file}|]
       e <- doesFileExist file
       if e
         then return ()

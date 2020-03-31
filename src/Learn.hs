@@ -6,8 +6,8 @@ module Learn
   , defaultManagerSettings
   , predict
   , evaluate
-  , genAffine
-  , genBatchNorm
+  , randomAffine
+  , randomBatchNorm
   , initNN
   , hotone
   , convertTrains
@@ -63,14 +63,14 @@ evaluate layers samples = fromIntegral nOk / fromIntegral (length samples)
     nOk = length $ filter (uncurry (==)) results
     results = map (second $ predict layers) samples
 
-genAffine :: Int -> Int -> IO (ForwardLayer R)
-genAffine nIn nOut = do
+randomAffine :: Int -> Int -> IO (ForwardLayer R)
+randomAffine nIn nOut = do
   weights <- rand nIn nOut
   bias <- flatten <$> rand nOut 1
   return $ AffineForward weights bias
 
-genBatchNorm :: Int -> IO (ForwardLayer R)
-genBatchNorm n = do
+randomBatchNorm :: Int -> IO (ForwardLayer R)
+randomBatchNorm n = do
   rows <- rand 2 n
   let [gamma, beta] = toRows rows
   return $ BatchNormForward (BatchNormParam gamma beta)
@@ -78,13 +78,13 @@ genBatchNorm n = do
 initNN :: (Int -> IO (ForwardLayer R)) -> [Int] -> IO (ForwardNN R)
 initNN genMid ns = do
   let ((x, y):ps) = spans [] ns
-  layers <- foldl' join (genAffine x y) ps
+  layers <- foldl' join (randomAffine x y) ps
   return $ ForwardNN layers SoftmaxWithCrossForward
   where
     join pre (x, y) = do
       b <- pre
       o <- genMid y
-      a <- genAffine x y
+      a <- randomAffine x y
       return $ a ~> o ~> b
     spans rs [a, b]   = (a, b) : rs
     spans rs (a:b:xs) = spans ((a, b) : rs) (b : xs)

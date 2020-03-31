@@ -1,5 +1,6 @@
 {-# LANGUAGE ConstraintKinds  #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE QuasiQuotes      #-}
 
 module Layers
   ( ForwardLayer(..)
@@ -19,7 +20,8 @@ module Layers
   ) where
 
 import           Control.Arrow
-import           Control.Lens          hiding ((<~))
+import           Control.Lens            hiding ((<~))
+import           Data.String.Interpolate as S (i)
 import           Debug.Trace
 import           Numeric
 import           Numeric.LinearAlgebra
@@ -98,7 +100,7 @@ forward ::
 forward (AffineForward w b) x = (AffineBackward w b x, affinem w b x)
 forward (BatchNormForward param) x = (BatchNormBackward param cache, out)
   where
-    (cache, out) = batchNormm param x
+    (cache, out) = batchNorm param x
 forward SigmoidForward x = (SigmoidBackward y, y)
   where
     y = sigmoidm x
@@ -118,7 +120,7 @@ backward rate (BatchNormBackward (BatchNormParam gamma beta) cache) d =
   (BatchNormForward param, d')
   where
     param = BatchNormParam (gamma - scale rate dgamma) (beta - scale rate dbeta)
-    (dgamma, dbeta, d') = batchNormmBackward cache d
+    (dgamma, dbeta, d') = batchNormBackward cache d
 backward _ (SigmoidBackward y) d = (SigmoidForward, sigmoidBackward y d)
 backward _ (ReLUBackward x) d = (ReLUForward, relumBackward x d)
 backward r (JoinedBackwardLayer a b) d0 = (a' ~> b', d2)

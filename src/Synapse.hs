@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MonoLocalBinds   #-}
+{-# LANGUAGE QuasiQuotes      #-}
 
 module Synapse
   ( sigmoid
@@ -19,13 +20,13 @@ module Synapse
   , BatchNormParam(..)
   , BatchNormCache(..)
   , batchNorm
-  , batchNormm
-  , batchNormmBackward
+  , batchNormBackward
   ) where
 
+import           Data.String.Interpolate as S (i)
 import           Debug.Trace
 import           Numeric.LinearAlgebra
-import           Prelude               hiding ((<>))
+import           Prelude                 hiding ((<>))
 
 sigmoid :: (Floating a) => a -> a
 sigmoid a = 1 / (1 + exp (-a))
@@ -130,8 +131,8 @@ affinemBackward w x d = (dx, dw, db)
 data Numeric a =>
      BatchNormParam a =
   BatchNormParam
-    (Vector a) -- ^ beta
     (Vector a) -- ^ gamma
+    (Vector a) -- ^ beta
   deriving (Show, Eq)
 
 data Numeric a =>
@@ -142,66 +143,49 @@ data Numeric a =>
     (Matrix a) -- ^ ivar
     (Matrix a) -- ^ xmu
     (Vector a) -- ^ sqrtvar
-    (Vector a) -- ^ var
   deriving (Show, Eq)
 
-batchNorm :: (Floating a, Numeric a, Num (Vector a)) => Vector a -> Vector a
-batchNorm v = cmap f v
-  where
-    f x = (x - average) / b
-    b = sqrt vari + small
-    vari = sumElements ((v - scalar average) ^ 2) / m
-    average = sumElements v / m
-    m = fromIntegral $ size v
-    small = 1e-10
-
-batchNormm ::
-     (Floating a, Numeric a, Num (Vector a))
+batchNorm ::
+     (Floating a, Numeric a, Num (Vector a), Floating (Vector a), Show a)
   => BatchNormParam a
   -> Matrix a
   -> (BatchNormCache a, Matrix a)
-batchNormm (BatchNormParam gamma beta) x =
-  (BatchNormCache gammam xhat ivar xmu sqrtvar var, out)
+batchNorm (BatchNormParam gamma beta) x =
+  (BatchNormCache gammam xhat ivar xmu sqrtvar, out)
   where
     (nRows, nCols) = size x
     epsilon = 1e-10
-    sum0 m = fromList $ sumElements `map` toColumns m
+    ave0 m = (fromList $ sumElements `map` toColumns m) / fromIntegral nRows
     xRows v = fromRows $ replicate nRows v
     -- step 1
-    mu = sum0 x / fromIntegral nRows
+    mu = trace [i|Step 1: x=#{x}|] $ ave0 x
     -- step 2
-    xmu = x - xRows mu
+    xmu = trace [i|Step 2: mu=#{mu}|] $ x - xRows mu
     -- step 3
-    sq = xmu ^ 2
+    sq = trace [i|Step 3: xmu=#{xmu}|] $ xmu ^ 2
     -- step 4
-    var = sum0 sq / fromIntegral nRows
+    var = trace [i|Step 4: sq=#{sq}|] $ ave0 sq
     -- step 5
-    sqrtvar = cmap (\a -> sqrt (a + epsilon)) var
+    sqrtvar = trace [i|Step 5: var=#{var}|] $ sqrt (var + epsilon)
     -- step 6
-    ivar = xRows $ 1.0 / sqrtvar
+    ivar = trace [i|Step 6: sqrtvar=#{sqrtvar}|] $ xRows $ 1.0 / sqrtvar
     -- step 7
-    xhat = xmu * ivar
+    xhat = trace [i|Step 7: ivar=#{ivar}|] $ xmu * ivar
     -- step 8
     gammam = xRows gamma
-    gammax = gammam * xhat
+    gammax = trace [i|Step 8: xhat=#{xhat}|] $ gammam * xhat
     -- step 9
-    out = gammax + xRows beta
+    out = trace [i|Step 9: gammax=#{gammax}|] $ gammax + xRows beta
 
-batchNormmBackward ::
-     ( Floating a
-     , Numeric a
-     , Num (Vector a)
-     , Floating (Vector a)
-     , Container Vector a
-     )
+batchNormBackward ::
+     (Floating a, Numeric a, Num (Vector a), Floating (Vector a))
   => BatchNormCache a
   -> Matrix a
   -> (Vector a, Vector a, Matrix a)
-batchNormmBackward (BatchNormCache gamma xhat ivar xmu sqrtvar var) dout =
+batchNormBackward (BatchNormCache gamma xhat ivar xmu sqrtvar) dout =
   (dgamma, dbeta, dx)
   where
     (nRows, nCols) = size dout
-    epsilon = 1e-10
     sum0 m = fromList $ sumElements `map` toColumns m
     spawnRows r = fromRows $ replicate nRows (r / fromIntegral nRows)
     -- step 9
@@ -213,9 +197,9 @@ batchNormmBackward (BatchNormCache gamma xhat ivar xmu sqrtvar var) dout =
     dxmu1 = dxhat * ivar
     divar = sum0 $ dxhat * xmu
     -- step 6
-    dsqrtvar = (-1 / (sqrtvar ^ 2)) * divar
+    dsqrtvar = -1 / (sqrtvar ^ 2) * divar
     -- step 5
-    dvar = (1 / sqrt (var + epsilon)) * dsqrtvar * 0.5
+    dvar = 0.5 / sqrtvar * dsqrtvar
     -- step 4
     dsq = spawnRows dvar
     -- step 3

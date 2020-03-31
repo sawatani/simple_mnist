@@ -110,7 +110,7 @@ propsConvertTrains = do
 
 propsInitNN =
   it "size of layers" $ do
-    r <- initNN ReLUForward [16, 50, 8, 10]
+    r <- initNN (\_ -> return ReLUForward) [16, 50, 8, 10]
     let ForwardNN lA SoftmaxWithCrossForward = r
     let JoinedForwardLayer (AffineForward m1 b1) lB = lA
     let JoinedForwardLayer ReLUForward lC = lB

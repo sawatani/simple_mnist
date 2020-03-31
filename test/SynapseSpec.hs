@@ -20,6 +20,7 @@ spec = do
   describe "CrossEntropy" propsCrossEntropy
   describe "SoftmaxWithCross" propsSoftmaxWithCross
   describe "Affine" propsAffine
+  describe "BatchNorm" propsBatchNorm
 
 propsDouble = do
   prop "multiple" $
@@ -175,6 +176,21 @@ propsAffine = do
                   db = A.vector $ foldr (zipWith (+)) (replicate n 0.0) dss
                in (reduce nx, reduce nw, reduce $ A.asRow nb) `shouldBe`
                   (reduce dx, reduce dw, reduce $ A.asRow db)
+
+propsBatchNorm = do
+  prop "forward single" $
+    forAll
+      (do n <- choose (10, 100)
+          d <- choose (10, 100)
+          vs <- vectorOf (n * d) (arbitrary :: Gen Double)
+          return $ A.matrix d vs) $ \x ->
+      let (n, d) = A.size x
+          param =
+            BatchNormParam
+              (A.fromList $ replicate n 1.0)
+              (A.fromList $ replicate n 0.0)
+          (_, yB) = batchNorm param x
+       in yB `shouldBe` yB
 
 genSignal :: Gen Double
 genSignal = (arbitrary :: Gen Double) `suchThat` (\a -> -10 <= a && a <= 10)

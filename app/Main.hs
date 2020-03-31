@@ -46,5 +46,5 @@ doLearn =
       map (^.. each) $ [0 ..] `zip` reverse losses
   where
     genAfterLayer n = do
-      bn <- genBatchNorm n
+      bn <- randomBatchNorm n
       return $ bn ~> ReLUForward

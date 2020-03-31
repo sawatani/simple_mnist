@@ -112,10 +112,10 @@ propsInitNN =
   it "size of layers" $ do
     r <- initNN ReLUForward [16, 50, 8, 10]
     let ForwardNN lA SoftmaxWithCrossForward = r
-    let JoinedForwardLayer lB (AffineForward m3 b3) = lA
-    let JoinedForwardLayer lC ReLUForward = lB
-    let JoinedForwardLayer lD (AffineForward m2 b2) = lC
-    let JoinedForwardLayer (AffineForward m1 b1) ReLUForward = lD
+    let JoinedForwardLayer (AffineForward m1 b1) lB = lA
+    let JoinedForwardLayer ReLUForward lC = lB
+    let JoinedForwardLayer (AffineForward m2 b2) lD = lC
+    let JoinedForwardLayer ReLUForward (AffineForward m3 b3) = lD
     let ms = map size [m1, m2, m3]
     let bs = map size [b1, b2, b3]
     (ms, bs) `shouldBe` ([(16, 50), (50, 8), (8, 10)], [50, 8, 10])
